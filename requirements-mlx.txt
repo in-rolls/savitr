@@ -1,0 +1,10 @@
+# MLX backend env (.venv-mlx) — Apple Silicon only. Create with:
+#   uv venv --python 3.12 .venv-mlx && uv pip install --python .venv-mlx -r requirements-mlx.txt
+# Kept separate from requirements.txt: mlx-vlm pins huggingface-hub>=1, surya-ocr needs <1.
+mlx-vlm>=0.6
+pdf2image>=1.17     # needs poppler (pdftoppm) on PATH
+pillow>=10
+
+# Convert the model once:
+#   .venv-mlx/bin/python -m mlx_vlm convert --hf-path datalab-to/surya-ocr-2 \
+#       --mlx-path models/surya-mlx-4bit -q --q-bits 4

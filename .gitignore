@@ -1,0 +1,14 @@
+.venv/
+.venv-mlx/
+__pycache__/
+*.pyc
+*.log
+
+# large model artifacts — keep out of git
+*.gguf
+models/
+*.safetensors
+
+# benchmark outputs + fixtures. NOTE: the local gold/Q4 fixtures are REAL voter records
+# (names, EPIC ids) — PII — so all *.json is gitignored and stays local.
+*.json
