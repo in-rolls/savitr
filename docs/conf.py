@@ -21,7 +21,15 @@ extensions = [
 
 # The heavy / Apple-Silicon-only deps are lazy-imported in the code, but mock them so the docs
 # build on any runner (ubuntu CI) without installing mlx/mlx-vlm/surya.
-autodoc_mock_imports = ["mlx_vlm", "mlx", "pdf2image", "huggingface_hub", "surya", "openai"]
+autodoc_mock_imports = [
+    "mlx_vlm",
+    "mlx",
+    "pdf2image",
+    "huggingface_hub",
+    "surya",
+    "openai",
+    "httpx",
+]
 autodoc_typehints = "description"
 autodoc_member_order = "bysource"
 autosummary_generate = True
