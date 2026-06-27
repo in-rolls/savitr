@@ -1,5 +1,4 @@
-.venv/
-.venv-mlx/
+.venv*/
 __pycache__/
 *.pyc
 *.log
@@ -12,3 +11,22 @@ models/
 # benchmark outputs + fixtures. NOTE: the local gold/Q4 fixtures are REAL voter records
 # (names, EPIC ids) — PII — so all *.json is gitignored and stays local.
 *.json
+
+# distillation corpus + rendered pages: real roll images + voter targets (PII) — local only
+corpus/
+pages/
+*.jsonl
+*.png
+
+# Kaggle build dirs — derived from training/, copies may carry injected config
+kernel/
+kernel_train/
+kernel_out/
+
+# python build + docs artifacts
+build/
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+docs/_build/

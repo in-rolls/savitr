@@ -1,75 +1,97 @@
-# savitr — making Surya OCR fast on Apple Silicon
+# savitr — fast Surya OCR on Apple Silicon, for Indian electoral rolls
 
-Acceleration work for [Surya OCR](https://github.com/datalab-to/surya) (`surya-ocr-2`, a
-650M-param Qwen3-VL-style OCR model) on Apple Silicon (M-series / MPS), driven by a concrete
-workload: parsing scanned Indian electoral-roll PDFs into structured voter records, at
-state-to-national scale, locally (no cloud GPU).
+[![PyPI](https://img.shields.io/pypi/v/savitr.svg)](https://pypi.org/project/savitr/)
+[![Model](https://img.shields.io/badge/%F0%9F%A4%97%20model-in-rolls%2Fsavitr-yellow)](https://huggingface.co/in-rolls/savitr)
+[![Docs](https://img.shields.io/badge/docs-in--rolls.github.io%2Fsavitr-blue)](https://in-rolls.github.io/savitr/)
 
-Surya is accurate on this data but slow on a Mac. This repo measures *why*, then optimizes —
-quantization, parallelism, image-token/decode reduction, an MLX backend, and a narrow
-distilled model — scoring every speed variant against unmodified f16 Surya output so we know
-the accuracy cost of each win.
+savitr makes [Surya OCR](https://github.com/datalab-to/surya) (`datalab-to/surya-ocr-2`, a 650M
+Qwen3.5-VL-style model) fast on Apple Silicon via **MLX** (~3.6× over llama.cpp), and ships a
+distilled, **electoral-roll-specific** model — *terse-Surya* — that emits one compact line per
+voter instead of verbose HTML (~5× fewer decode tokens at Surya's accuracy), plus a pipeline that
+turns scanned roll PDFs into the canonical voter CSV. Runs locally; no cloud GPU.
 
-## Measured baseline (M4 / 16 GB, llama.cpp backend)
-
-| Fact | Value |
-|---|---|
-| Warm voter page | **~110 s/page** (not the ~9 s headline; that's lighter pages) |
-| Vision encode | ~5 s/page — **decode dominates** (~100 s) |
-| Why decode is slow | page injects a large image-token context (Qwen-VL ≥1024 img tokens) → ~11–48 tok/s |
-| Q4_K_M quant (llama.cpp) | 1.41× decode (48→68 tok/s) |
-| **MLX 4-bit backend** | **~3.6× decode, ~5.2× full-PDF end-to-end (33.9 s/page), <2 GB, ~97–100% field acc** ✅ |
-
-**Headline: the MLX backend is the win** — converting `datalab-to/surya-ocr-2` to MLX 4-bit
-runs at ~175–180 tok/s (vs llama.cpp's 48–68), dropping a full PDF from ~178 s/page to
-~34 s/page. Tested negatives: compact prompt, guided JSON schema, parallelism. See
-[FINDINGS.md](FINDINGS.md). Scale: ~24k pages for Manipur (1,756 PDFs × ~14 pp) ≈ ~11 days/M4
-on MLX (vs ~49 on the f16 baseline).
-
-## Layout
-
-```
-savitr/
-  mlx_backend.py       # RELEASABLE: an 'mlx' Backend for Surya (SuryaInferenceManager(method="mlx"))
-  parse_manipur_mlx.py # PRODUCTION: PDF -> canonical voter CSV (reuses repo fields.py)
-  mlx_ocr.py           # MLX engine — load once, OCR a PDF, layout-robust voter parser
-bench/
-  bench_surya.py       # warm-path timing (llama.cpp): load / cold / warm s-per-page + structure
-  compare_quality.py   # run the real Surya pipeline per model variant; score vs f16 gold
-  prompt_tokens.py     # bbox vs compact prompt token comparison (negative result)
-  guided_schema.py     # guided JSON token+accuracy test (negative result)
-  bench_mlx.py         # MLX decode tok/s on a real page
-  mlx_quality.py       # MLX full-page speed + field accuracy vs f16 gold
-models/                # quantized GGUFs + MLX model (gitignored)
-```
-
-## Environments
-- `.venv` (py3.14) — `surya-ocr` + llama.cpp backend (baseline/benchmarks)
-- `.venv-mlx` (uv, py3.12) — `mlx-vlm` for the MLX engine. Run MLX scripts with this one.
-
-## Key knobs (Surya settings / env)
-
-- `SURYA_GGUF_LOCAL_MODEL_PATH`, `SURYA_GGUF_LOCAL_MMPROJ_PATH` — run a custom GGUF (e.g. Q4)
-- `SURYA_INFERENCE_PARALLEL` — llama-server slots (default 8)
-- `SURYA_INFERENCE_KEEP_ALIVE` — keep the server warm across invocations
-- `SURYA_MAX_TOKENS_FULL_PAGE` — decode ceiling per page
-
-## Usage
+## Install
 
 ```bash
-# PRODUCTION: fast OCR a whole PDF with the MLX engine
-.venv-mlx/bin/python savitr/mlx_ocr.py PATH/TO/roll.pdf
+pip install savitr               # MLX runtime + terse roll model (auto-downloaded from HF)
+pip install "savitr[backend]"    # + the generic MLX Backend for Surya's own pipeline
+pip install "savitr[train]"      # + the distillation toolchain (transformers/peft/torch)
+```
 
-# MLX decode speed + accuracy vs f16 gold
-.venv-mlx/bin/python bench/bench_mlx.py PATH/TO/roll.pdf --page 3
-.venv-mlx/bin/python bench/mlx_quality.py PATH/TO/roll.pdf --pages 3-4
+Apple Silicon (M-series). The terse model is fetched from [`in-rolls/savitr`](https://huggingface.co/in-rolls/savitr) on first use.
 
-# timing baseline on a real PDF (llama.cpp)
-python bench/bench_surya.py PATH/TO/roll.pdf --pages 3-8
+## Quickstart
 
-# accuracy cost of a fast variant vs f16 gold
-python bench/compare_quality.py run roll.pdf --pages 3-5 --out gold.json
-python bench/compare_quality.py run roll.pdf --pages 3-5 \
-    --model models/surya-2-Q4_K_M.gguf --mmproj <mmproj.gguf> --out q4.json
-python bench/compare_quality.py cmp gold.json q4.json
+```bash
+# fast voter OCR with the distilled terse model
+savitr ocr roll.pdf --terse
+
+# whole rolls -> canonical voter CSV (terse model for voter pages + Surya for cover metadata)
+savitr parse-rolls -d english/ -o voters.csv --terse
+```
+
+```python
+from savitr import MLXSuryaOCR, parse_terse
+eng = MLXSuryaOCR("models/surya-terse-8bit", terse=True)
+text, _ = eng.ocr_image("page.png")
+voters = parse_terse(text)        # [{'id': 'KMY...', 'elector_name': ..., 'age': ..., ...}]
+```
+
+## terse-Surya (`in-rolls/savitr`)
+
+Surya self-distilled to emit pipe-delimited voter rows
+(`epic|name|relation(F/H/M)|relative|house|age|sex`). Trained for **$0 on a free Kaggle T4** by
+labeling roll pages with Surya itself (teacher) and LoRA-fine-tuning to the terse format.
+
+**Speed (M4 / 16 GB)**
+
+| Pipeline | s/page |
+|---|---|
+| Original Surya (llama.cpp f16) | ~178 |
+| MLX 4-bit, HTML | ~38 |
+| **terse-Surya MLX 8-bit** | **~17.5** |
+
+**Out-of-sample fidelity to the Surya teacher** (held-out constituencies)
+
+| Field | | Field | |
+|---|---|---|---|
+| EPIC | 97% | relative name | 88% |
+| house | 99% | name | 82% |
+| sex | 98% | relation | 79% |
+| age | 96% | voter recall | 81% |
+
+> **v0.1** — an early model (77 training pages); a larger-corpus revision is in progress.
+> Absolute accuracy ≈ these × the teacher's own ~93–95%.
+
+## What's in the box
+
+Three layers — two you install and use, one for reproducing the model:
+
+```
+savitr/                # the pip package (use it)
+  mlx_ocr.py           # GENERIC MLX Surya engine (MLXSuryaOCR) — run any Surya OCR fast
+  mlx_backend.py       # GENERIC Surya Backend (mlx) — also offered upstream (PR.md)
+  rolls/               # ELECTORAL-ROLL app: parse · fields · schema · pipeline · ocr
+  cli.py, __init__.py
+training/              # repo-only: build_corpus · train · eval · merge · kaggle_*  (reproduce the model)
+```
+
+- **Use it — electoral rolls (the product):** `savitr parse-rolls` / `savitr ocr --terse` run the
+  distilled terse model on roll PDFs → voter records / canonical CSV (`savitr.rolls`).
+- **Use it — generic fast Surya:** `savitr.MLXSuryaOCR` + the `mlx` `Backend` run *any* Surya OCR
+  ~3.6× faster on Apple Silicon (also offered upstream to Surya — see [`PR.md`](PR.md)).
+- **Reproduce it — training/distillation:** lives in top-level `training/`, **not shipped in the
+  wheel** (install the `[train]` extra to run it). We ship code to *use* the model, not to train it.
+
+## How it was built / what was tried
+
+See [FINDINGS.md](FINDINGS.md) for the measured baseline (decode, not cold-start, dominates;
+~110 s/page on llama.cpp), the MLX win, the tested negatives (compact prompt, guided JSON,
+parallelism), and the distillation method + numbers.
+
+## Develop
+
+```bash
+pip install -e ".[backend,train,dev]"
+ruff format . && ruff check .
 ```

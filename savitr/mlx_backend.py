@@ -32,11 +32,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 import httpx
 from openai import OpenAI
-
 from surya.inference.backends.base import Backend, ServerHandle
 from surya.inference.backends.openai_client import chat_completions_batch
 from surya.inference.schema import BatchInputItem, BatchOutputItem
@@ -54,12 +52,14 @@ def _free_port() -> int:
 
 
 class MlxBackend(Backend):
+    """Surya inference backend that serves the model via mlx-vlm's OpenAI server."""
+
     name = "mlx"
 
     def __init__(self):
-        self.handle: Optional[ServerHandle] = None
-        self._client: Optional[OpenAI] = None
-        self._proc: Optional[subprocess.Popen] = None
+        self.handle: ServerHandle | None = None
+        self._client: OpenAI | None = None
+        self._proc: subprocess.Popen | None = None
 
     # ---- config (env, mirroring SURYA_INFERENCE_* conventions) ----
     @property
@@ -70,6 +70,7 @@ class MlxBackend(Backend):
         return os.path.abspath(p)
 
     def start(self) -> ServerHandle:
+        """Spawn (or reuse) the mlx-vlm server and return its handle."""
         if self.handle is not None:
             return self.handle
 
@@ -85,24 +86,44 @@ class MlxBackend(Backend):
             model_path = self._model_path
             port = int(os.environ.get("SURYA_MLX_PORT", "0")) or _free_port()
             mlx_python = os.environ.get("SURYA_MLX_PYTHON", sys.executable)
-            cmd = [mlx_python, "-m", "mlx_vlm", "server",
-                   "--model", model_path, "--host", host, "--port", str(port)]
+            cmd = [
+                mlx_python,
+                "-m",
+                "mlx_vlm",
+                "server",
+                "--model",
+                model_path,
+                "--host",
+                host,
+                "--port",
+                str(port),
+            ]
+            # Speculative decoding via Surya's native MTP head — byte-identical output, ~1.14×.
+            draft = os.environ.get("SURYA_MLX_DRAFT_MODEL")
+            if draft:
+                cmd += [
+                    "--draft-model",
+                    os.path.abspath(draft),
+                    "--draft-kind",
+                    os.environ.get("SURYA_MLX_DRAFT_KIND", "mtp"),
+                ]
             for extra in (os.environ.get("SURYA_MLX_EXTRA_ARGS", "")).split():
                 cmd.append(extra)
             log_path = Path("~/.cache/datalab/surya/mlx_server.log").expanduser()
             log_path.parent.mkdir(parents=True, exist_ok=True)
             logger.info(f"Spawning mlx-vlm server: {' '.join(cmd)}")
             self._proc = subprocess.Popen(
-                cmd, stdout=open(log_path, "ab"), stderr=subprocess.STDOUT,
-                start_new_session=True)
+                cmd, stdout=open(log_path, "ab"), stderr=subprocess.STDOUT, start_new_session=True
+            )
             atexit.register(self.stop)
             base = f"http://{host}:{port}/v1"
             self._wait_ready(base)
             # mlx-vlm registers the model under the exact --model string it was given.
             model_name = model_path
 
-        self.handle = ServerHandle(base_url=base, model_name=model_name,
-                                   spawned_by_us=self._proc is not None)
+        self.handle = ServerHandle(
+            base_url=base, model_name=model_name, spawned_by_us=self._proc is not None
+        )
         self._client = OpenAI(api_key="EMPTY", base_url=base)
         return self.handle
 
@@ -112,7 +133,8 @@ class MlxBackend(Backend):
             if self._proc is not None and self._proc.poll() is not None:
                 raise RuntimeError(
                     f"mlx-vlm server exited early (code {self._proc.returncode}); "
-                    f"see ~/.cache/datalab/surya/mlx_server.log")
+                    f"see ~/.cache/datalab/surya/mlx_server.log"
+                )
             try:
                 if httpx.get(f"{base}/models", timeout=2).status_code == 200:
                     return
@@ -122,7 +144,7 @@ class MlxBackend(Backend):
         raise RuntimeError("mlx-vlm server did not become ready in time.")
 
     @staticmethod
-    def _probe_model_id(base: str) -> Optional[str]:
+    def _probe_model_id(base: str) -> str | None:
         try:
             data = httpx.get(f"{base}/models", timeout=5).json()
             return data["data"][0]["id"]
@@ -130,6 +152,7 @@ class MlxBackend(Backend):
             return None
 
     def stop(self) -> None:
+        """Terminate the mlx-vlm server and clear cached client/handle."""
         if self._proc is not None and self._proc.poll() is None:
             self._proc.terminate()
             try:
@@ -140,9 +163,11 @@ class MlxBackend(Backend):
         self.handle = None
         self._client = None
 
-    def generate(self, batch: List[BatchInputItem]) -> List[BatchOutputItem]:
+    def generate(self, batch: list[BatchInputItem]) -> list[BatchOutputItem]:
+        """Run a batch of chat completions against the running server."""
         if self.handle is None or self._client is None:
             self.start()
+        assert self.handle is not None  # start() populates handle + client
         return chat_completions_batch(
             batch,
             client=self._client,

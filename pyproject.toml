@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "savitr"
+version = "0.1.0"
+description = "Fast Surya OCR on Apple Silicon for Indian electoral rolls (MLX runtime + a distilled terse roll model)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "in-rolls" }]
+keywords = ["ocr", "surya", "mlx", "apple-silicon", "electoral-roll", "india", "vlm", "distillation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "mlx-vlm>=0.1",
+    "pdf2image>=1.16",
+    "pillow>=9",
+    "huggingface_hub>=0.23",
+]
+
+[project.optional-dependencies]
+backend = ["surya-ocr>=0.16"]                                  # generic MLX Backend for Surya
+train = ["transformers>=5.12", "peft>=0.11", "accelerate>=0.30", "torch>=2.2"]
+dev = ["ruff>=0.6", "mypy>=1.10", "build"]
+docs = ["sphinx>=7", "furo", "myst-parser", "sphinx-autodoc-typehints"]
+
+[project.scripts]
+savitr = "savitr.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/in-rolls/savitr"
+Repository = "https://github.com/in-rolls/savitr"
+Issues = "https://github.com/in-rolls/savitr/issues"
+Model = "https://huggingface.co/in-rolls/savitr"
+
+[tool.hatch.build.targets.wheel]
+packages = ["savitr"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Lint the shipped package strictly; training/ is repo-only repro scripts (incl. self-contained
+# Kaggle kernels) — kept out of the strict lint gate.
+extend-exclude = ["training", ".venv*", "build", "dist"]
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear, pydocstyle (modern docstrings)
+select = ["E", "F", "W", "I", "UP", "B", "D"]
+ignore = ["E741", "D105", "D107"]   # ambiguous `l` (vendored), magic-method + __init__ docstrings
+
+[tool.ruff.lint.per-file-ignores]
+"savitr/rolls/fields.py" = ["E501", "D"]   # vendored verbatim from parse_unsearchable_rolls
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["savitr"]
+# mlx-vlm, pdf2image, huggingface_hub, surya ship no type stubs — don't fail on their imports.
+ignore_missing_imports = true
+warn_redundant_casts = true
+warn_unused_ignores = true
