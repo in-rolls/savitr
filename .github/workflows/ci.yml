@@ -13,10 +13,11 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv pip install --system ruff mypy
-      - run: ruff check savitr
-      - run: ruff format --check savitr
-      - run: mypy savitr
+      - run: uv venv
+      - run: uv pip install ruff mypy
+      - run: .venv/bin/ruff check savitr
+      - run: .venv/bin/ruff format --check savitr
+      - run: .venv/bin/mypy savitr
 
   build:
     runs-on: ubuntu-latest
