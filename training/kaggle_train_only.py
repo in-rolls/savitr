@@ -158,7 +158,7 @@ def load_corpus():
     return read(train_jsonl), read(test_jsonl)
 
 
-def train(model, processor, data, epochs=3, lr=1e-4, grad_accum=8, rank=16):
+def train(model, processor, data, epochs=1, lr=1e-4, grad_accum=8, rank=16, out=None):
     from peft import LoraConfig, get_peft_model
 
     model = get_peft_model(
@@ -226,6 +226,11 @@ def train(model, processor, data, epochs=3, lr=1e-4, grad_accum=8, rank=16):
                         f"({(time.time()-t0)/60:.1f} min)"
                     )
                     run = 0.0
+                # Checkpoint the adapter periodically: the T4 is slow (~8 min/step) and the
+                # Kaggle 12h cap killed a prior end-of-run-only save, so always keep the latest.
+                if out and step % 10 == 0:
+                    model.save_pretrained(out)
+                    print(f"  checkpoint @ step {step} -> {out}")
     return model
 
 
@@ -320,7 +325,7 @@ def main():
         rep["stage"] = "model_loaded"
         save()
         _t = time.time()
-        model = train(model, processor, train_set)
+        model = train(model, processor, train_set, out=out)
         rep["train_minutes"] = round((time.time() - _t) / 60, 1)
         rep["stage"] = "trained"
         save()

@@ -199,6 +199,10 @@ def parse_terse(text: str) -> list[dict]:
         parts = [p.strip() for p in line.split("|")]
         while parts and parts[0] == "":  # serial column is usually blank
             parts.pop(0)
+        # gold targets lead with a numeric serial (model output usually omits it); drop it
+        # when an EPIC follows, so the EPIC anchor lands on parts[0] either way.
+        if len(parts) > 1 and parts[0].isdigit() and _EPIC_TOK.fullmatch(parts[1]):
+            parts.pop(0)
         if len(parts) < 2:
             continue
         v = {c: "" for c in TERSE_COLS}

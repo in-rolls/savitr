@@ -16,5 +16,8 @@ model = PeftModel.from_pretrained(base, ADAPTER)
 print("merging ...")
 model = model.merge_and_unload()
 model.save_pretrained(OUT)
-AutoProcessor.from_pretrained(ADAPTER).save_pretrained(OUT)
+# Save the BASE processor/tokenizer, NOT the adapter's: the Kaggle adapter dir carries
+# tokenizer/processor files from a newer transformers that the local mlx_vlm can't read
+# (causes a "[gather] indices must be integral" crash at inference). The base files are canonical.
+AutoProcessor.from_pretrained("datalab-to/surya-ocr-2").save_pretrained(OUT)
 print(f"merged terse-Surya -> {OUT}")
