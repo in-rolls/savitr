@@ -1,6 +1,7 @@
 # savitr — fast Surya OCR on Apple Silicon, for Indian electoral rolls
 
 [![PyPI](https://img.shields.io/pypi/v/savitr.svg)](https://pypi.org/project/savitr/)
+[![Downloads](https://static.pepy.tech/badge/savitr)](https://pepy.tech/project/savitr)
 [![Model](https://img.shields.io/badge/%F0%9F%A4%97%20model-gojiberries%2Fsavitr-yellow)](https://huggingface.co/gojiberries/savitr)
 [![Docs](https://img.shields.io/badge/docs-in--rolls.github.io%2Fsavitr-blue)](https://in-rolls.github.io/savitr/)
 
