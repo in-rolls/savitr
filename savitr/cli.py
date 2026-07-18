@@ -5,11 +5,12 @@ import sys
 USAGE = """savitr — fast Surya OCR on Apple Silicon (electoral rolls)
 
 usage:
-  savitr ocr PDF [--terse] [--pages 3-14]          OCR a PDF's pages to voter records
-  savitr parse-rolls (-f PDF | -d DIR) -o OUT.csv [--terse]
-                                                   parse rolls into the canonical voter CSV
+  savitr ocr PDF [-o OUT.csv] [--pages 3-14]       OCR a PDF's pages to voter records
+  savitr parse-rolls (-f PDF | -d DIR) -o OUT.csv   parse rolls into the canonical voter CSV
+  savitr sample                                     print the path to a bundled sample roll PDF
 
-Add --terse to use the distilled terse-Surya model (faster, electoral-roll-specific).
+The distilled terse-Surya model (fast, electoral-roll-specific) is the default; add --html to use
+the full Surya HTML model instead. Try it now:  savitr ocr "$(savitr sample)"
 Run `savitr ocr -h` / `savitr parse-rolls -h` for the full options of each subcommand.
 """
 
@@ -30,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
         from savitr.rolls.pipeline import main as run
 
         return run()
+    if cmd == "sample":
+        from savitr.samples import sample_roll_path
+
+        print(sample_roll_path())
+        return 0
     print(f"savitr: unknown command {cmd!r}\n", file=sys.stderr)
     print(USAGE)
     return 2

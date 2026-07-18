@@ -19,8 +19,8 @@ import os
 import re
 import sys
 import time
+from typing import TYPE_CHECKING
 
-from savitr.mlx_ocr import MLXSuryaOCR
 from savitr.rolls.parse import (
     TERSE_PROMPT,
     dedupe_voters,
@@ -28,6 +28,10 @@ from savitr.rolls.parse import (
     parse_voters,
     resolve_terse_model,
 )
+from savitr.rolls.pdfio import page_count, render_page, require_poppler
+
+if TYPE_CHECKING:
+    from savitr.mlx_ocr import MLXSuryaOCR
 
 # Roll schema + cover-field logic. Default to savitr's vendored copy (self-contained); set
 # MANIPUR_DIR to point at parse_unsearchable_rolls/scripts/manipur to use that repo's copy instead.
@@ -61,35 +65,34 @@ def _synthetic_page(text: str) -> dict:
 
 
 def parse_pdf_mlx(
-    eng: MLXSuryaOCR, pdf_path: str, dpi: int, cover_eng: MLXSuryaOCR | None = None
+    eng: "MLXSuryaOCR",
+    pdf_path: str,
+    dpi: int,
+    terse: bool = True,
+    cover_eng: "MLXSuryaOCR | None" = None,
 ) -> tuple[list[dict], dict]:
     """OCR + parse one PDF with MLX; return (rows, recon) in the canonical schema.
 
-    cover_eng: when set (terse mode), the terse model `eng` extracts voters from interior pages
-    while this HTML model reads the first two pages for cover metadata (the terse model was
-    trained only on interior voter pages, so it can't read covers).
-    """
-    from pdf2image import convert_from_path
-    from pdf2image.pdf2image import pdfinfo_from_path
+    terse mode (default): the terse model ``eng`` reads every page for voters (covers yield none),
+    and — only if ``cover_eng`` is provided — the HTML model reads the first two pages for cover
+    metadata. Without a cover model, voter extraction still works; cover metadata is just skipped
+    and the AC/part number is taken from the filename.
 
+    HTML mode (``terse=False``): the HTML model ``eng`` reads every page for voters + metadata.
+    """
     fname = os.path.basename(pdf_path)
     ac_no, part_no = ac_part_from_filename(fname)
-    npages = int(pdfinfo_from_path(pdf_path)["Pages"])
+    npages = page_count(pdf_path)
 
     page_texts = []
     voters = []
     for i in range(npages):
-        png = f"/tmp/mlx_{os.getpid()}_p{i + 1}.png"
-        convert_from_path(pdf_path, dpi=dpi, first_page=i + 1, last_page=i + 1)[0].convert(
-            "RGB"
-        ).save(png)
-        if cover_eng is not None:  # terse mode
-            if i < 2:  # cover/maps -> HTML model for metadata
-                html, _ = cover_eng.ocr_image(png)
-                page_texts.append(html_to_text(html))
-            else:  # interior -> terse model for voters
-                voters.extend(parse_terse(eng.ocr_image(png)[0]))
-        else:  # HTML mode (original)
+        png = render_page(pdf_path, i + 1, dpi, f"/tmp/mlx_{os.getpid()}_p{i + 1}.png")
+        if terse:  # terse model reads voters from every page (covers simply yield none)
+            voters.extend(parse_terse(eng.ocr_image(png)[0]))
+            if cover_eng is not None and i < 2:  # optional cover metadata
+                page_texts.append(html_to_text(cover_eng.ocr_image(png)[0]))
+        else:  # HTML mode: one model does voters + metadata
             html, _ = eng.ocr_image(png)
             page_texts.append(html_to_text(html))
             voters.extend(parse_voters(html))
@@ -153,13 +156,20 @@ def main() -> int:
     ap.add_argument(
         "--terse",
         action="store_true",
-        help="use distilled terse-Surya for voter pages (~2.7x faster, Surya accuracy); "
-        "the HTML model still reads cover pages for metadata",
+        help="(default) use the distilled terse-Surya voter model (~2.7x faster, Surya accuracy)",
     )
     ap.add_argument(
-        "--mlx-path",
-        default=None,
-        help="voter model; default surya-terse-8bit with --terse, else surya-mlx-4bit",
+        "--html",
+        action="store_true",
+        help="use the full Surya HTML model instead (needs a local --mlx-path Surya MLX model)",
+    )
+    ap.add_argument(
+        "--mlx-path", default=None, help="override the voter model dir (default: the terse model)"
+    )
+    ap.add_argument(
+        "--cover-model",
+        default="models/surya-mlx-4bit",
+        help="local Surya MLX model for cover-page metadata (optional; skipped if absent)",
     )
     ap.add_argument("--dpi", type=int, default=192)
     ap.add_argument("--limit", type=int, default=None)
@@ -181,15 +191,29 @@ def main() -> int:
         with open(args.out, newline="", encoding="utf-8") as fh:
             done = {r["filename"] for r in csv.DictReader(fh)}
 
+    require_poppler()  # fail fast with a friendly hint before loading a model
+    from savitr.mlx_ocr import MLXSuryaOCR
+    from savitr.rolls.ocr import html_model_or_exit
+
+    terse = not args.html
     cover_eng = None
-    if args.terse:
+    if terse:
         voter_path = args.mlx_path or resolve_terse_model()
-        log.info("loading terse voter model %s + HTML cover model ...", voter_path)
         eng = MLXSuryaOCR(voter_path, max_tokens=2048, prompt=TERSE_PROMPT)
-        cover_eng = MLXSuryaOCR("models/surya-mlx-4bit", max_tokens=8192)
+        if os.path.isdir(args.cover_model):
+            log.info("terse voter model %s + cover model %s", voter_path, args.cover_model)
+            cover_eng = MLXSuryaOCR(args.cover_model, max_tokens=8192)
+        else:
+            log.info(
+                "terse voter model %s; no cover model at %s -> cover metadata skipped "
+                "(AC/part from filename; pass --cover-model for full metadata)",
+                voter_path,
+                args.cover_model,
+            )
     else:
-        log.info("loading MLX model %s ...", args.mlx_path or "models/surya-mlx-4bit")
-        eng = MLXSuryaOCR(args.mlx_path or "models/surya-mlx-4bit")
+        html_path = html_model_or_exit(args.mlx_path or "models/surya-mlx-4bit")
+        log.info("loading Surya HTML model %s ...", html_path)
+        eng = MLXSuryaOCR(html_path)
 
     write_header = not (args.resume and os.path.exists(args.out))
     total_voters = 0
@@ -203,7 +227,7 @@ def main() -> int:
                 continue
             t = time.time()
             try:
-                rows, recon = parse_pdf_mlx(eng, pdf, args.dpi, cover_eng=cover_eng)
+                rows, recon = parse_pdf_mlx(eng, pdf, args.dpi, terse=terse, cover_eng=cover_eng)
             except Exception as exc:  # noqa: BLE001 - one bad PDF must not kill the run
                 log.exception("FAILED %s: %s", os.path.basename(pdf), exc)
                 continue

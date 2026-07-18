@@ -220,7 +220,17 @@ def parse_terse(text: str) -> list[dict]:
             v["house_no"] = parts.pop()
         if parts:
             v["father_or_husband_name"] = " ".join(parts)
-        if v["elector_name"]:
-            v["original_or_amendment"] = "original"
-            voters.append(v)
+        if not v["elector_name"]:
+            continue
+        # Real voter rows lead with an EPIC. Rows where no EPIC anchored (blank id) are usually
+        # page-footer boilerplate ("Age as on 01-01-2025", "# - Modified as per supplement") or a
+        # decode-loop artifact that mis-split — drop them if they carry stray EPIC tokens (a loop
+        # leaks EPICs mid-line), don't start with a letter, or lack the age+sex a voter always has.
+        # This only scrutinizes EPIC-less rows, so genuine voters (and the eval numbers) are untouched.
+        if not v["id"]:
+            nm = v["elector_name"]
+            if _EPIC_TOK.search(line) or not nm[:1].isalpha() or not (v["age"] and v["sex"]):
+                continue
+        v["original_or_amendment"] = "original"
+        voters.append(v)
     return voters

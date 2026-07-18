@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "savitr"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fast Surya OCR on Apple Silicon for Indian electoral rolls (MLX runtime + a distilled terse roll model)"
 readme = "README.md"
 requires-python = ">=3.12"
