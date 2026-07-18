@@ -43,7 +43,7 @@ savitr = "savitr.cli:main"
 Homepage = "https://github.com/in-rolls/savitr"
 Repository = "https://github.com/in-rolls/savitr"
 Issues = "https://github.com/in-rolls/savitr/issues"
-Model = "https://huggingface.co/in-rolls/savitr"
+Model = "https://huggingface.co/gojiberries/savitr"
 
 [tool.hatch.build.targets.wheel]
 packages = ["savitr"]

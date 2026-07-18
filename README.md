@@ -1,7 +1,7 @@
 # savitr — fast Surya OCR on Apple Silicon, for Indian electoral rolls
 
 [![PyPI](https://img.shields.io/pypi/v/savitr.svg)](https://pypi.org/project/savitr/)
-[![Model](https://img.shields.io/badge/%F0%9F%A4%97%20model-in-rolls%2Fsavitr-yellow)](https://huggingface.co/in-rolls/savitr)
+[![Model](https://img.shields.io/badge/%F0%9F%A4%97%20model-gojiberries%2Fsavitr-yellow)](https://huggingface.co/gojiberries/savitr)
 [![Docs](https://img.shields.io/badge/docs-in--rolls.github.io%2Fsavitr-blue)](https://in-rolls.github.io/savitr/)
 
 savitr makes [Surya OCR](https://github.com/datalab-to/surya) (`datalab-to/surya-ocr-2`, a 650M
@@ -18,7 +18,7 @@ pip install "savitr[backend]"    # + the generic MLX Backend for Surya's own pip
 pip install "savitr[train]"      # + the distillation toolchain (transformers/peft/torch)
 ```
 
-Apple Silicon (M-series). The terse model is fetched from [`in-rolls/savitr`](https://huggingface.co/in-rolls/savitr) on first use.
+Apple Silicon (M-series). The terse model is fetched from [`gojiberries/savitr`](https://huggingface.co/gojiberries/savitr) on first use.
 
 ## Quickstart
 
@@ -32,12 +32,13 @@ savitr parse-rolls -d english/ -o voters.csv --terse
 
 ```python
 from savitr import MLXSuryaOCR, parse_terse
-eng = MLXSuryaOCR("models/surya-terse-8bit", terse=True)
+from savitr.rolls.parse import TERSE_PROMPT
+eng = MLXSuryaOCR("models/surya-terse-8bit", prompt=TERSE_PROMPT)
 text, _ = eng.ocr_image("page.png")
 voters = parse_terse(text)        # [{'id': 'KMY...', 'elector_name': ..., 'age': ..., ...}]
 ```
 
-## terse-Surya (`in-rolls/savitr`)
+## terse-Surya (`gojiberries/savitr`)
 
 Surya self-distilled to emit pipe-delimited voter rows
 (`epic|name|relation(F/H/M)|relative|house|age|sex`). Trained for **$0 on a free Kaggle T4** by

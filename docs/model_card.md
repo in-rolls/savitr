@@ -16,7 +16,7 @@ library_name: mlx-vlm
 
 # savitr — terse electoral-roll OCR (distilled Surya)
 
-`in-rolls/savitr` is [`datalab-to/surya-ocr-2`](https://huggingface.co/datalab-to/surya-ocr-2)
+`gojiberries/savitr` is [`datalab-to/surya-ocr-2`](https://huggingface.co/datalab-to/surya-ocr-2)
 (650M Qwen3.5-VL-style OCR) **self-distilled** to read Indian electoral-roll pages and emit one
 compact, pipe-delimited line per voter instead of verbose HTML:
 
@@ -25,7 +25,7 @@ epic|name|relation(F/H/M)|relative_name|house|age|sex
 ```
 
 That is ~5× fewer decode tokens than the HTML output, so it runs ~2.7× faster end-to-end at the
-teacher's accuracy. Converted to **MLX** for Apple Silicon (8-bit recommended; 4-bit also included).
+teacher's accuracy. Converted to **MLX** 8-bit for Apple Silicon.
 
 ## Usage
 
@@ -38,8 +38,8 @@ savitr ocr roll.pdf --terse          # auto-downloads this model
 from huggingface_hub import snapshot_download
 from savitr import MLXSuryaOCR, parse_terse
 from savitr.rolls.parse import TERSE_PROMPT
-path = snapshot_download("in-rolls/savitr")
-eng = MLXSuryaOCR(f"{path}/surya-terse-8bit", prompt=TERSE_PROMPT)
+path = snapshot_download("gojiberries/savitr")
+eng = MLXSuryaOCR(path, prompt=TERSE_PROMPT)
 voters = parse_terse(eng.ocr_image("page.png")[0])
 ```
 

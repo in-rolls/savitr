@@ -14,7 +14,7 @@ import os
 import re
 
 #: Hugging Face repo for the distilled terse roll model (used when no local copy is present).
-TERSE_REPO = os.environ.get("SAVITR_TERSE_REPO", "in-rolls/savitr")
+TERSE_REPO = os.environ.get("SAVITR_TERSE_REPO", "gojiberries/savitr")
 
 
 def resolve_terse_model(local: str = "models/surya-terse-8bit") -> str:
