@@ -226,7 +226,7 @@ def parse_terse(text: str) -> list[dict]:
         # page-footer boilerplate ("Age as on 01-01-2025", "# - Modified as per supplement") or a
         # decode-loop artifact that mis-split — drop them if they carry stray EPIC tokens (a loop
         # leaks EPICs mid-line), don't start with a letter, or lack the age+sex a voter always has.
-        # This only scrutinizes EPIC-less rows, so genuine voters (and the eval numbers) are untouched.
+        # Only EPIC-less rows are checked, so genuine voters (and the eval numbers) stay untouched.
         if not v["id"]:
             nm = v["elector_name"]
             if _EPIC_TOK.search(line) or not nm[:1].isalpha() or not (v["age"] and v["sex"]):
