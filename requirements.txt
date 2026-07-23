@@ -2,7 +2,7 @@
 surya-ocr>=0.20      # the VLM OCR engine being accelerated
 pdf2image>=1.17      # render PDF pages; needs poppler (pdftoppm) on PATH
 pillow>=10
-numpy>=1.26
+numpy>=2.5.1
 
 # External (not pip): llama.cpp suite on PATH (llama-server, llama-quantize,
 # llama-batched-bench, llama-mtmd-cli) — `brew install llama.cpp`.
