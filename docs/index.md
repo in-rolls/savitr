@@ -21,9 +21,11 @@ savitr parse-rolls -d english/ -o voters.csv --terse
 ```
 
 ```python
-from savitr import MLXSuryaOCR, parse_terse
+from savitr import MLXSuryaOCR, parse_terse, resolve_terse_model
+from savitr.rolls.parse import TERSE_PROMPT
 
-eng = MLXSuryaOCR("models/surya-terse-8bit", prompt=...)
+# resolve_terse_model() downloads the roll model on first use and returns where it landed
+eng = MLXSuryaOCR(resolve_terse_model(), prompt=TERSE_PROMPT)
 voters = parse_terse(eng.ocr_image("page.png")[0])
 ```
 

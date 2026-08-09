@@ -48,6 +48,17 @@ Model = "https://huggingface.co/gojiberries/savitr"
 [tool.hatch.build.targets.wheel]
 packages = ["savitr"]
 
+[tool.pytest.ini_options]
+# Only tests/. `training/` holds repo-only repro scripts, one of which is named test_*.py by
+# accident: it imports torch/peft at module scope and reads an absolute path, so a bare `pytest`
+# at the repo root died during *collection* before reaching any real test. training/ is already
+# outside the ruff gate for the same reason.
+testpaths = ["tests"]
+# The package is not installed in CI: `mlx` is Apple-only and would not resolve on the runner.
+# It does not need to be - `savitr.mlx_ocr` imports mlx_vlm inside the constructor, so resolution
+# is importable anywhere. Putting the repo root on the path is enough.
+pythonpath = ["."]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

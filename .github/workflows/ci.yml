@@ -14,10 +14,11 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv venv
-      - run: uv pip install ruff mypy
+      - run: uv pip install ruff mypy pytest
       - run: .venv/bin/ruff check savitr
       - run: .venv/bin/ruff format --check savitr
       - run: .venv/bin/mypy savitr
+      - run: .venv/bin/pytest
 
   build:
     runs-on: ubuntu-latest

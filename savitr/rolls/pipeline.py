@@ -192,7 +192,7 @@ def main() -> int:
             done = {r["filename"] for r in csv.DictReader(fh)}
 
     require_poppler()  # fail fast with a friendly hint before loading a model
-    from savitr.mlx_ocr import MLXSuryaOCR
+    from savitr.mlx_ocr import MLXSuryaOCR, base_model_path
     from savitr.rolls.ocr import html_model_or_exit
 
     terse = not args.html
@@ -200,18 +200,21 @@ def main() -> int:
     if terse:
         voter_path = args.mlx_path or resolve_terse_model()
         eng = MLXSuryaOCR(voter_path, max_tokens=2048, prompt=TERSE_PROMPT)
-        if os.path.isdir(args.cover_model):
-            log.info("terse voter model %s + cover model %s", voter_path, args.cover_model)
-            cover_eng = MLXSuryaOCR(args.cover_model, max_tokens=8192)
-        else:
+        # The cover model is base Surya and is optional: without it the AC and part come from
+        # the filename and the run continues. So this reports the same thing --html would refuse
+        # over, and keeps going - a missing optional model should say why, not stop a batch.
+        try:
+            cover_path = base_model_path(args.cover_model)
+            log.info("terse voter model %s + cover model %s", voter_path, cover_path)
+            cover_eng = MLXSuryaOCR(cover_path, max_tokens=8192)
+        except FileNotFoundError as missing:
             log.info(
-                "terse voter model %s; no cover model at %s -> cover metadata skipped "
-                "(AC/part from filename; pass --cover-model for full metadata)",
+                "terse voter model %s; cover metadata skipped (AC/part from filename).\n%s",
                 voter_path,
-                args.cover_model,
+                missing,
             )
     else:
-        html_path = html_model_or_exit(args.mlx_path or "models/surya-mlx-4bit")
+        html_path = html_model_or_exit(args.mlx_path)
         log.info("loading Surya HTML model %s ...", html_path)
         eng = MLXSuryaOCR(html_path)
 

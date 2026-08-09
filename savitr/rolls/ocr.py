@@ -2,7 +2,6 @@
 
 import argparse
 import csv
-import os
 import sys
 import time
 from collections.abc import Callable
@@ -18,15 +17,22 @@ from savitr.rolls.parse import (
 from savitr.rolls.pdfio import page_count, render_page, require_poppler
 
 
-def html_model_or_exit(path: str) -> str:
-    """Return a local Surya MLX model dir for HTML mode, or exit (no HTML model is published)."""
-    if os.path.isdir(path):
-        return path
-    raise SystemExit(
-        f"--html needs a local Surya MLX model at {path!r}, which isn't published on the Hub.\n"
-        "Drop --html to use the distilled terse model (auto-downloaded, recommended), or pass\n"
-        "--mlx-path to your own MLX-converted Surya (see training/ to build one)."
-    )
+def html_model_or_exit(path: str | None = None) -> str:
+    """Return a local base-Surya MLX dir for HTML mode, or exit with the command that makes one.
+
+    The same message the library raises, as a ``SystemExit`` so the CLI does not print a traceback.
+    It used to point at ``training/`` for building a model, which is the *distillation* toolchain -
+    the converter is the one ``mlx_vlm convert`` line :func:`savitr.mlx_ocr.convert_hint` gives.
+    """
+    from savitr.mlx_ocr import base_model_path
+
+    try:
+        return base_model_path(path)
+    except FileNotFoundError as missing:
+        raise SystemExit(
+            f"--html needs a converted base Surya model.\n\n{missing}\n\n"
+            "Or drop --html to use the distilled terse model, which downloads itself."
+        ) from missing
 
 
 def main() -> int:
@@ -65,7 +71,7 @@ def main() -> int:
         mlx_path = args.mlx_path or resolve_terse_model()
         parse, prompt = parse_terse, TERSE_PROMPT
     else:
-        mlx_path = html_model_or_exit(args.mlx_path or "models/surya-mlx-4bit")
+        mlx_path = html_model_or_exit(args.mlx_path)
         parse, prompt = parse_voters, PROMPT
 
     npages = page_count(args.pdf)  # validates poppler, then reads the page count

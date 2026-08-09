@@ -58,6 +58,33 @@ text, _ = eng.ocr_image("page.png")
 voters = parse_terse(text)        # [{'id': 'KMY...', 'elector_name': ..., 'age': ..., ...}]
 ```
 
+## Two models, and which one you want
+
+**Electoral rolls → the terse model.** Published at
+[`gojiberries/savitr`](https://huggingface.co/gojiberries/savitr) and downloaded on first use, so
+everything above works with no setup. It was distilled to emit voter rows and will emit them
+whatever the page holds — it is not a general OCR.
+
+**Anything else → base Surya.** Upstream publishes `datalab-to/surya-ocr-2` but not an MLX build of
+it, so convert it once (~1.3 GB fetched, ~500 MB written):
+
+```bash
+python -m mlx_vlm convert --hf-path datalab-to/surya-ocr-2 \
+    --mlx-path models/surya-mlx-4bit -q --q-bits 4
+```
+
+```python
+from savitr import MLXSuryaOCR
+
+eng = MLXSuryaOCR()                       # finds models/surya-mlx-4bit, or $SAVITR_BASE_PATH
+eng = MLXSuryaOCR("/some/other/model")    # or say where
+text, _ = eng.ocr_image("page.png")       # HTML: <table><tr><td>…
+```
+
+With no converted model, every entry point — the constructor, `savitr ocr --html`, and
+`--cover-model` — says the same thing and repeats the command above. `savitr ocr --html` needs it;
+`--cover-model` is optional metadata and carries on without it.
+
 ## terse-Surya (`gojiberries/savitr`)
 
 Surya self-distilled to emit pipe-delimited voter rows
