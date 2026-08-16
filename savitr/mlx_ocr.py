@@ -29,10 +29,14 @@ class MLXSuryaOCR:
 
     def ocr_image(self, png_path: str) -> tuple[str, int]:
         """OCR one page image; return ``(text, generation_token_count)``."""
+        # mlx_vlm annotates `generate` more narrowly than it accepts: `processor`
+        # is declared ProcessorLike | PreTrainedTokenizer while load() hands
+        # back a ProcessorMixin, and `prompt` is declared str while the chat
+        # form is a list of message dicts. Both work at runtime.
         res = self._generate(
             self.model,
-            self.processor,
-            self.prompt,
+            self.processor,  # pyright: ignore[reportArgumentType]
+            self.prompt,  # pyright: ignore[reportArgumentType]
             image=png_path,
             max_tokens=self.max_tokens,
             verbose=False,

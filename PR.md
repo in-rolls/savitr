@@ -28,9 +28,10 @@ in this repo (a `Backend` subclass that spawns the mlx-vlm OpenAI server, attach
 
 **2. `surya/inference/__init__.py` — `_build_backend`:**
 ```python
-    if method == "mlx":
-        from surya.inference.backends.mlx import MlxBackend
-        return MlxBackend()
+if method == "mlx":
+    from surya.inference.backends.mlx import MlxBackend
+
+    return MlxBackend()
 ```
 
 **3. `_autodetect_backend()`** (optional) — prefer MLX on Apple Silicon when available:
@@ -42,9 +43,9 @@ in this repo (a `Backend` subclass that spawns the mlx-vlm OpenAI server, attach
 
 **4. `surya/settings.py`** — add:
 ```python
-    SURYA_MLX_MODEL_PATH: Optional[str] = None   # converted MLX model dir
-    SURYA_MLX_PYTHON: Optional[str] = None        # python env that has mlx-vlm
-    SURYA_MLX_PORT: Optional[int] = None
+SURYA_MLX_MODEL_PATH: Optional[str] = None  # converted MLX model dir
+SURYA_MLX_PYTHON: Optional[str] = None  # python env that has mlx-vlm
+SURYA_MLX_PORT: Optional[int] = None
 ```
 (This repo's module reads them from `os.environ` so it works without a fork.)
 

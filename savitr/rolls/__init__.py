@@ -1,7 +1,7 @@
 """The electoral-roll application: parsing, vendored schema, and the PDF -> CSV pipeline."""
 
-from savitr.rolls import fields  # noqa: F401
-from savitr.rolls.parse import (  # noqa: F401
+from . import fields  # noqa: F401
+from .parse import (  # noqa: F401
     TERSE_PROMPT,
     dedupe_voters,
     parse_terse,
@@ -9,7 +9,7 @@ from savitr.rolls.parse import (  # noqa: F401
     resolve_terse_model,
     to_terse,
 )
-from savitr.rolls.schema import (  # noqa: F401
+from .schema import (  # noqa: F401
     COLUMNS,
     STATE,
     YEAR,
