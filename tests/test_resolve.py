@@ -12,11 +12,12 @@ The assertion that matters is not that the error is raised. It is that the messa
 """
 
 import os
+from unittest.mock import patch
 
 import pytest
 
 from savitr.mlx_ocr import BASE_REPO, base_model_path
-from savitr.rolls.parse import resolve_terse_model
+from savitr.rolls.parse import TERSE_REPO, TERSE_REVISION, resolve_terse_model
 
 
 @pytest.fixture(autouse=True)
@@ -77,4 +78,26 @@ def test_a_local_terse_model_is_used_without_touching_the_network(tmp_path):
     because the download path needs the network and this suite must not."""
     model = tmp_path / "terse"
     model.mkdir()
-    assert resolve_terse_model(str(model)) == str(model)
+    with patch("huggingface_hub.snapshot_download") as download:
+        assert resolve_terse_model(str(model)) == str(model)
+    download.assert_not_called()
+
+
+def test_a_missing_terse_model_uses_the_pinned_hub_revision(tmp_path):
+    missing = tmp_path / "missing"
+    with patch("huggingface_hub.snapshot_download", return_value="/cache/savitr") as download:
+        assert resolve_terse_model(str(missing)) == "/cache/savitr"
+    download.assert_called_once_with(repo_id=TERSE_REPO, revision=TERSE_REVISION)
+
+
+def test_the_hub_revision_is_an_immutable_commit():
+    assert TERSE_REPO == "gojiberries/savitr"
+    assert len(TERSE_REVISION) == 40
+    assert set(TERSE_REVISION) <= set("0123456789abcdef")
+
+
+@pytest.mark.live
+def test_the_pinned_hub_revision_exists():
+    from huggingface_hub import list_repo_files
+
+    assert list_repo_files(TERSE_REPO, revision=TERSE_REVISION)

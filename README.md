@@ -77,9 +77,9 @@ python -m mlx_vlm convert --hf-path datalab-to/surya-ocr-2 \
 ```python
 from savitr import MLXSuryaOCR
 
-eng = MLXSuryaOCR()                       # finds models/surya-mlx-4bit, or $SAVITR_BASE_PATH
-eng = MLXSuryaOCR("/some/other/model")    # or say where
-text, _ = eng.ocr_image("page.png")       # HTML: <table><tr><td>…
+eng = MLXSuryaOCR()  # finds models/surya-mlx-4bit, or $SAVITR_BASE_PATH
+eng = MLXSuryaOCR("/some/other/model")  # or say where
+text, _ = eng.ocr_image("page.png")  # HTML: <table><tr><td>…
 ```
 
 With no converted model, every entry point — the constructor, `savitr ocr --html`, and

@@ -15,6 +15,7 @@ import re
 
 #: Hugging Face repo for the distilled terse roll model (used when no local copy is present).
 TERSE_REPO = os.environ.get("SAVITR_TERSE_REPO", "gojiberries/savitr")
+TERSE_REVISION = os.environ.get("SAVITR_TERSE_REVISION", "c850ccd21031bb86595f1ba5f9679e6b401ec04f")
 
 
 def resolve_terse_model(local: str = "models/surya-terse-8bit") -> str:
@@ -24,7 +25,7 @@ def resolve_terse_model(local: str = "models/surya-terse-8bit") -> str:
     from huggingface_hub import snapshot_download
 
     print(f"fetching terse model {TERSE_REPO} from Hugging Face ...")
-    return snapshot_download(TERSE_REPO)
+    return snapshot_download(repo_id=TERSE_REPO, revision=TERSE_REVISION)
 
 
 # Layout-robust voter extraction: anchor on "Name :", read fields forward, attach the

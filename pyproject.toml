@@ -56,6 +56,8 @@ testpaths = ["tests"]
 # It does not need to be - `savitr.mlx_ocr` imports mlx_vlm inside the constructor, so resolution
 # is importable anywhere. Putting the repo root on the path is enough.
 pythonpath = ["."]
+addopts = ["--strict-markers", "-m", "not live"]
+markers = ["live: reaches Hugging Face and is deselected by default"]
 
 [tool.ruff]
 line-length = 100
@@ -74,6 +76,7 @@ ignore = ["E741", "D105", "D107"]   # ambiguous `l` (vendored), magic-method + _
 
 [tool.ruff.lint.per-file-ignores]
 "savitr/rolls/fields.py" = ["E501", "D"]   # vendored verbatim from parse_unsearchable_rolls
+"tests/**" = ["D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
@@ -104,11 +107,3 @@ dev = ["ruff>=0.16", "pyright>=1.1.390", "build", { include-group = "test" }]
 # installed. Twelve were in the package, which is the number worth acting on.
 include = ["savitr"]
 typeCheckingMode = "standard"
-
-[tool.pytest.ini_options]
-# Without this pytest walked the whole repo and collected
-# training/test_adapter_local.py -- a manual sanity script, not a test: it has
-# a hardcoded /tmp path and imports peft, which lives in the `train` extra. The
-# import aborted collection outright, so `pytest` failed before running
-# anything.
-testpaths = ["tests"]

@@ -39,7 +39,10 @@ from huggingface_hub import snapshot_download
 from savitr import MLXSuryaOCR, parse_terse
 from savitr.rolls.parse import TERSE_PROMPT
 
-path = snapshot_download("gojiberries/savitr")
+path = snapshot_download(
+    repo_id="gojiberries/savitr",
+    revision="c850ccd21031bb86595f1ba5f9679e6b401ec04f",
+)
 eng = MLXSuryaOCR(path, prompt=TERSE_PROMPT)
 voters = parse_terse(eng.ocr_image("page.png")[0])
 ```
