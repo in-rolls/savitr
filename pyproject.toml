@@ -33,8 +33,6 @@ dependencies = [
 [project.optional-dependencies]
 backend = ["surya-ocr>=0.16"]                                  # generic MLX Backend for Surya
 train = ["transformers>=5.12", "peft>=0.11", "accelerate>=0.30", "torch>=2.2"]
-dev = ["ruff>=0.6", "mypy>=1.10", "build"]
-docs = ["sphinx>=7", "furo", "myst-parser", "sphinx-autodoc-typehints"]
 
 [project.scripts]
 savitr = "savitr.cli:main"
@@ -51,9 +49,12 @@ packages = ["savitr"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# Lint the shipped package strictly; training/ is repo-only repro scripts (incl. self-contained
-# Kaggle kernels) — kept out of the strict lint gate.
-extend-exclude = ["training", ".venv*", "build", "dist"]
+# Lint the shipped package strictly; training/ and bench/ are repo-only repro
+# scripts (incl. self-contained Kaggle kernels) — kept out of the strict lint
+# gate. bench/ was the same category and simply was not listed: it carried all
+# 57 of the repo's lint findings, 19 of them missing-docstring on one-off
+# measurement functions and 3 long lines in output-table format strings.
+extend-exclude = ["training", "bench", ".venv*", "build", "dist"]
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, pyupgrade, bugbear, pydocstyle (modern docstrings)
@@ -73,3 +74,30 @@ files = ["savitr"]
 ignore_missing_imports = true
 warn_redundant_casts = true
 warn_unused_ignores = true
+
+[dependency-groups]
+docs = ["sphinx>=7", "furo", "myst-parser", "sphinx-autodoc-typehints"]
+# There were none, and no pytest anywhere in the file. `uv run pytest` then
+# resolved to a pytest outside this project, which cannot see the package --
+# so a test importing `savitr` failed with ModuleNotFoundError while
+# `uv run python -c "import savitr"` worked. That is a confusing way to
+# discover that the test dependency was never declared.
+test = ["pytest>=8"]
+dev = ["ruff>=0.16", "pyright>=1.1.390", "build", { include-group = "test" }]
+
+[tool.pyright]
+# Same scope decision ruff already makes: the shipped package is checked
+# strictly, and training/ and bench/ are repo-only repro and measurement
+# scripts. Unscoped, pyright reported 55 errors, 59 of them from those two
+# directories -- most for imports that live in the `train` extra and are not
+# installed. Twelve were in the package, which is the number worth acting on.
+include = ["savitr"]
+typeCheckingMode = "standard"
+
+[tool.pytest.ini_options]
+# Without this pytest walked the whole repo and collected
+# training/test_adapter_local.py -- a manual sanity script, not a test: it has
+# a hardcoded /tmp path and imports peft, which lives in the `train` extra. The
+# import aborted collection outright, so `pytest` failed before running
+# anything.
+testpaths = ["tests"]

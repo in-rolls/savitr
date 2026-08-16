@@ -39,7 +39,15 @@ MANIPUR_DIR = os.environ.get("MANIPUR_DIR")
 if MANIPUR_DIR:
     sys.path.insert(0, MANIPUR_DIR)
     import fields  # noqa: E402
-    from parse_manipur_2025 import COLUMNS, STATE, YEAR, ac_part_from_filename  # noqa: E402
+
+    # Resolved from MANIPUR_DIR, inserted into sys.path four lines above, so it
+    # is unresolvable statically by construction.
+    from parse_manipur_2025 import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+        COLUMNS,
+        STATE,
+        YEAR,
+        ac_part_from_filename,
+    )
 else:
     from savitr.rolls import fields
     from savitr.rolls.schema import COLUMNS, STATE, YEAR, ac_part_from_filename

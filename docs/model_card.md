@@ -38,6 +38,7 @@ savitr ocr roll.pdf --terse          # auto-downloads this model
 from huggingface_hub import snapshot_download
 from savitr import MLXSuryaOCR, parse_terse
 from savitr.rolls.parse import TERSE_PROMPT
+
 path = snapshot_download("gojiberries/savitr")
 eng = MLXSuryaOCR(path, prompt=TERSE_PROMPT)
 voters = parse_terse(eng.ocr_image("page.png")[0])

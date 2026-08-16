@@ -35,8 +35,8 @@ geometry voter parser. **Never copy it.** savitr imports it (see below).
 `parse_manipur_mlx.py` adds the parse repo to `sys.path` and imports `fields` + `COLUMNS`:
 ```python
 MANIPUR_DIR = os.environ.get(
-    "MANIPUR_DIR",
-    "<abs path>/parse_unsearchable_rolls/scripts/manipur")  # override via env if relocated
+    "MANIPUR_DIR", "<abs path>/parse_unsearchable_rolls/scripts/manipur"
+)  # override via env if relocated
 ```
 Dependency flows **savitr -> parse_unsearchable_rolls** (for the shared schema/metadata) and
 **parse_unsearchable_rolls -> savitr** (the benchmark consumes savitr's MLX engine as its
