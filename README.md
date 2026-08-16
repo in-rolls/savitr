@@ -53,9 +53,10 @@ savitr parse-rolls -d english/ -o voters.csv
 ```python
 from savitr import MLXSuryaOCR, parse_terse, resolve_terse_model
 from savitr.rolls.parse import TERSE_PROMPT
-eng = MLXSuryaOCR(resolve_terse_model(), prompt=TERSE_PROMPT)   # downloads the model if not local
+
+eng = MLXSuryaOCR(resolve_terse_model(), prompt=TERSE_PROMPT)  # downloads the model if not local
 text, _ = eng.ocr_image("page.png")
-voters = parse_terse(text)        # [{'id': 'KMY...', 'elector_name': ..., 'age': ..., ...}]
+voters = parse_terse(text)  # [{'id': 'KMY...', 'elector_name': ..., 'age': ..., ...}]
 ```
 
 ## Two models, and which one you want
