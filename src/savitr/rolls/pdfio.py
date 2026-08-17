@@ -1,4 +1,4 @@
-"""PDF rendering helpers with a friendly poppler check (shared by `ocr` and `parse-rolls`)."""
+"""PDF rendering helpers shared by the command-line tools."""
 
 import shutil
 
@@ -6,8 +6,7 @@ import shutil
 def require_poppler() -> None:
     """Exit with an install hint if poppler's ``pdfinfo``/``pdftoppm`` aren't on PATH.
 
-    ``pdf2image`` shells out to poppler, which isn't a pip dependency; without it every PDF
-    command dies with an opaque ``PDFInfoNotInstalledError``. Turn that into one clear line.
+    ``pdf2image`` shells out to poppler, which is not a Python dependency.
     """
     if shutil.which("pdfinfo") and shutil.which("pdftoppm"):
         return
@@ -28,9 +27,11 @@ def page_count(pdf_path: str) -> int:
 
 
 def render_page(pdf_path: str, page_1based: int, dpi: int, out_png: str) -> str:
-    """Render one 1-based page of ``pdf_path`` to ``out_png`` (RGB) and return the path."""
+    """Render one 1-based PDF page to an RGB PNG and return its path."""
     from pdf2image import convert_from_path
 
-    img = convert_from_path(pdf_path, dpi=dpi, first_page=page_1based, last_page=page_1based)[0]
+    img = convert_from_path(
+        pdf_path, dpi=dpi, first_page=page_1based, last_page=page_1based
+    )[0]
     img.convert("RGB").save(out_png)
     return out_png

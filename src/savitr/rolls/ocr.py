@@ -1,10 +1,17 @@
-"""`savitr ocr` — OCR a roll PDF's pages to voter records (distilled terse model by default)."""
+"""Implement ``savitr ocr`` for electoral-roll PDFs."""
+
+from __future__ import annotations
 
 import argparse
 import csv
 import sys
+import tempfile
 import time
-from collections.abc import Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from savitr.rolls.parse import (
     TERSE_COLS,
@@ -18,11 +25,10 @@ from savitr.rolls.pdfio import page_count, render_page, require_poppler
 
 
 def html_model_or_exit(path: str | None = None) -> str:
-    """Return a local base-Surya MLX dir for HTML mode, or exit with the command that makes one.
+    """Resolve base Surya for HTML mode or exit with conversion guidance.
 
-    The same message the library raises, as a ``SystemExit`` so the CLI does not print a traceback.
-    It used to point at ``training/`` for building a model, which is the *distillation* toolchain -
-    the converter is the one ``mlx_vlm convert`` line :func:`savitr.mlx_ocr.convert_hint` gives.
+    The CLI uses ``SystemExit`` so users see the library's guidance without a
+    traceback.
     """
     from savitr.mlx_ocr import base_model_path
 
@@ -39,7 +45,9 @@ def main() -> int:
     """Run the `savitr ocr` command: OCR a roll PDF's pages to voter records."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("pdf")
-    ap.add_argument("--pages", default=None, help="1-based range e.g. 3-14 (default: all)")
+    ap.add_argument(
+        "--pages", default=None, help="1-based range e.g. 3-14 (default: all)"
+    )
     ap.add_argument("--dpi", type=int, default=192)
     ap.add_argument(
         "-o",
@@ -48,17 +56,14 @@ def main() -> int:
         help="write voter records to this CSV (default: print a summary)",
     )
     ap.add_argument(
-        "--terse",
-        action="store_true",
-        help="(default) use the distilled terse-Surya model — ~5x fewer tokens, Surya accuracy",
-    )
-    ap.add_argument(
         "--html",
         action="store_true",
-        help="use the full Surya HTML model instead (needs a local --mlx-path Surya MLX model)",
+        help="use base Surya HTML output (requires a local MLX model)",
     )
     ap.add_argument(
-        "--mlx-path", default=None, help="override the model dir (default: the terse model)"
+        "--mlx-path",
+        default=None,
+        help="override the model dir (default: the terse model)",
     )
     args = ap.parse_args()
     require_poppler()  # fail fast before importing mlx or downloading the model
@@ -87,40 +92,50 @@ def main() -> int:
     else:
         idx = list(range(npages))
 
-    print(f"loading MLX model {mlx_path} (terse={terse}) ...")
+    print(f"loading MLX model {mlx_path} (terse={terse}) ...")  # noqa: T201
     eng = MLXSuryaOCR(mlx_path, max_tokens=(2048 if terse else 8192), prompt=prompt)
 
     all_voters: list[dict] = []
     total_voters = 0
     t0 = time.time()
     for i in idx:
-        png = f"/tmp/mlx_pdf_p{i + 1}.png"
-        render_page(args.pdf, i + 1, args.dpi, png)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temporary:
+            png = temporary.name
         t = time.time()
-        text, gtok = eng.ocr_image(png)
+        try:
+            render_page(args.pdf, i + 1, args.dpi, png)
+            text, gtok = eng.ocr_image(png)
+        finally:
+            Path(png).unlink(missing_ok=True)
         voters = parse(text)
         all_voters.extend(voters)
         n = len(voters)
         total_voters += n
         eg = (
-            f"  e.g. {voters[0]['number']}|{voters[0]['id']}|{voters[0]['elector_name']}"
+            "  e.g. "
+            f"{voters[0]['number']}|{voters[0]['id']}|"
+            f"{voters[0]['elector_name']}"
             if voters
             else ""
         )
-        print(f"  page {i + 1:>3}: {gtok:>5} tok, {time.time() - t:5.1f}s, {n:>2} voters{eg}")
+        duration = time.time() - t
+        print(  # noqa: T201
+            f"  page {i + 1:>3}: {gtok:>5} tok, {duration:5.1f}s, {n:>2} voters{eg}"
+        )
 
     elapsed = time.time() - t0
-    print(
-        f"\n{len(idx)} pages in {elapsed:.1f}s = {elapsed / max(len(idx), 1):.1f}s/page, "
+    seconds_per_page = elapsed / max(len(idx), 1)
+    print(  # noqa: T201
+        f"\n{len(idx)} pages in {elapsed:.1f}s = {seconds_per_page:.1f}s/page, "
         f"{total_voters} voters total"
     )
     if args.out:
-        rows = dedupe_voters(all_voters) if terse else all_voters
-        with open(args.out, "w", newline="", encoding="utf-8") as fh:
+        rows = dedupe_voters(all_voters)
+        with Path(args.out).open("w", newline="", encoding="utf-8") as fh:
             w = csv.DictWriter(fh, fieldnames=TERSE_COLS, extrasaction="ignore")
             w.writeheader()
             w.writerows(rows)
-        print(f"wrote {len(rows)} voter records -> {args.out}")
+        print(f"wrote {len(rows)} voter records -> {args.out}")  # noqa: T201
     return 0
 
 

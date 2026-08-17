@@ -27,10 +27,3 @@
 .. automodule:: savitr.rolls.schema
    :members:
 ```
-
-## Generic MLX backend — `savitr.mlx_backend`
-
-```{eval-rst}
-.. automodule:: savitr.mlx_backend
-   :members:
-```

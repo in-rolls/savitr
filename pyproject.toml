@@ -1,21 +1,21 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.11.32,<0.12"]
+build-backend = "uv_build"
 
 [project]
 name = "savitr"
-version = "0.2.0"
+version = "0.3.0"
 description = "Fast Surya OCR on Apple Silicon for Indian electoral rolls (MLX runtime + a distilled terse roll model)"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "in-rolls" }]
 keywords = ["ocr", "surya", "mlx", "apple-silicon", "electoral-roll", "india", "vlm", "distillation"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: GPU",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
@@ -24,14 +24,13 @@ classifiers = [
     "Topic :: Text Processing",
 ]
 dependencies = [
-    "mlx-vlm>=0.1",
+    "mlx-vlm>=0.1; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "pdf2image>=1.16",
-    "pillow>=9",
+    "pillow>=12.1.1",
     "huggingface_hub>=0.23",
 ]
 
 [project.optional-dependencies]
-backend = ["surya-ocr>=0.16"]                                  # generic MLX Backend for Surya
 train = ["transformers>=5.12", "peft>=0.11", "accelerate>=0.30", "torch>=2.2"]
 
 [project.scripts]
@@ -41,74 +40,81 @@ savitr = "savitr.cli:main"
 Homepage = "https://github.com/in-rolls/savitr"
 Repository = "https://github.com/in-rolls/savitr"
 Issues = "https://github.com/in-rolls/savitr/issues"
+Documentation = "https://in-rolls.github.io/savitr/"
 Model = "https://huggingface.co/gojiberries/savitr"
 
-[tool.hatch.build.targets.wheel]
-packages = ["savitr"]
+[tool.uv.build-backend]
+module-name = "savitr"
 
 [tool.pytest.ini_options]
-# Only tests/. `training/` holds repo-only repro scripts, one of which is named test_*.py by
-# accident: it imports torch/peft at module scope and reads an absolute path, so a bare `pytest`
-# at the repo root died during *collection* before reaching any real test. training/ is already
-# outside the ruff gate for the same reason.
 testpaths = ["tests"]
-# The package is not installed in CI: `mlx` is Apple-only and would not resolve on the runner.
-# It does not need to be - `savitr.mlx_ocr` imports mlx_vlm inside the constructor, so resolution
-# is importable anywhere. Putting the repo root on the path is enough.
-pythonpath = ["."]
+addopts = ["--strict-markers", "-m", "not live"]
+markers = ["live: reaches Hugging Face and is deselected by default"]
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 target-version = "py312"
-# Lint the shipped package strictly; training/ and bench/ are repo-only repro
-# scripts (incl. self-contained Kaggle kernels) — kept out of the strict lint
-# gate. bench/ was the same category and simply was not listed: it carried all
-# 57 of the repo's lint findings, 19 of them missing-docstring on one-off
-# measurement functions and 3 long lines in output-table format strings.
-extend-exclude = ["training", "bench", ".venv*", "build", "dist"]
+extend-exclude = [
+    "training",
+    "bench",
+    ".venv*",
+    "build",
+    "dist",
+    "_build",
+    "_site",
+    "_doctest",
+]
 
 [tool.ruff.lint]
-# pycodestyle, pyflakes, isort, pyupgrade, bugbear, pydocstyle (modern docstrings)
-select = ["E", "F", "W", "I", "UP", "B", "D"]
-ignore = ["E741", "D105", "D107"]   # ambiguous `l` (vendored), magic-method + __init__ docstrings
-
-[tool.ruff.lint.per-file-ignores]
-"savitr/rolls/fields.py" = ["E501", "D"]   # vendored verbatim from parse_unsearchable_rolls
+external = ["DOC"]
+select = [
+    "E", "W", "F", "I", "B", "C4", "UP", "N", "D", "S", "SIM", "T20", "PT", "RUF",
+    "PTH", "RET", "PIE", "FURB", "PERF", "DTZ", "LOG", "G", "TC", "FLY",
+    "RSE", "SLOT", "FA", "A", "EXE", "ICN", "PGH", "PLE", "ARG", "SLF",
+]
+# D203/D213: the google convention the fleet standard picks. W191/D206/D300:
+# ruff's own docs list these as always incompatible with `ruff format`, which
+# the standard also runs.
+ignore = ["D203", "D213", "W191", "D206", "D300", "D105", "D107", "E741"]
 
 [tool.ruff.lint.pydocstyle]
-convention = "pep257"
+convention = "google"
 
-[tool.mypy]
-python_version = "3.12"
-files = ["savitr"]
-# mlx-vlm, pdf2image, huggingface_hub, surya ship no type stubs — don't fail on their imports.
-ignore_missing_imports = true
-warn_redundant_casts = true
-warn_unused_ignores = true
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D", "ARG", "SLF"]
+"docs/**" = ["D"]
+"src/savitr/rolls/fields.py" = ["E501", "D"]
 
+[tool.pydoclint]
+style = "google"
+arg-type-hints-in-docstring = false
+check-return-types = false
+check-class-attributes = false
+allow-init-docstring = true
+exclude = '\.venv|tests|docs'
 [dependency-groups]
-docs = ["sphinx>=7", "furo", "myst-parser", "sphinx-autodoc-typehints"]
-# There were none, and no pytest anywhere in the file. `uv run pytest` then
-# resolved to a pytest outside this project, which cannot see the package --
-# so a test importing `savitr` failed with ModuleNotFoundError while
-# `uv run python -c "import savitr"` worked. That is a confusing way to
-# discover that the test dependency was never declared.
-test = ["pytest>=8"]
-dev = ["ruff>=0.16", "pyright>=1.1.390", "build", { include-group = "test" }]
+docs = [
+    "sphinx>=8",
+    "py-canon @ git+https://github.com/gojiplus/py-canon@v1",
+    "furo",
+    "myst-parser",
+    "sphinx-copybutton",
+]
+test = ["pytest>=8", "pytest-cov>=6"]
+dev = [
+    "ruff>=0.16",
+    "pyright>=1.1.390",
+    "pre-commit>=4",
+    "pydoclint>=0.5",
+    { include-group = "test" },
+]
 
 [tool.pyright]
-# Same scope decision ruff already makes: the shipped package is checked
-# strictly, and training/ and bench/ are repo-only repro and measurement
-# scripts. Unscoped, pyright reported 55 errors, 59 of them from those two
-# directories -- most for imports that live in the `train` extra and are not
-# installed. Twelve were in the package, which is the number worth acting on.
-include = ["savitr"]
+include = ["src"]
 typeCheckingMode = "standard"
 
-[tool.pytest.ini_options]
-# Without this pytest walked the whole repo and collected
-# training/test_adapter_local.py -- a manual sanity script, not a test: it has
-# a hardcoded /tmp path and imports peft, which lives in the `train` extra. The
-# import aborted collection outright, so `pytest` failed before running
-# anything.
-testpaths = ["tests"]
+[tool.coverage.run]
+source = ["src"]
+
+[tool.codespell]
+skip = "corpus/*,corpus_*/*,models/*,pages/*,kernel/*,kernel_*/*,docs/_build/*,_site/*,_doctest/*,dist/*,*.json,*.jsonl"

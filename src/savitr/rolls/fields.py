@@ -18,15 +18,19 @@ import re
 
 EPIC_RE = re.compile(r"\b([A-Z]{2,3}\d{6,8})\b")
 SERIAL_LINE_RE = re.compile(r"^\s*(#)?\s*(\d{1,4})\s*$")
-NAME_ANCHOR_RE = re.compile(r"^\s*Name\s*[:.]", re.I)  # voter name line, not "Name of ..."
-NAME_RE = re.compile(r"\bName\s*[:.]?\s*(.+)", re.I)
-REL_RE = re.compile(r"(Father|Husband|Mother)'?s?\s*Name\s*[:.]?\s*(.+)", re.I)
-HOUSE_RE = re.compile(r"House\s*Number\s*[:.]?\s*(.+)", re.I)
-AGE_RE = re.compile(r"Age\s*[:.]?\s*(\d{1,3})", re.I)
-GENDER_RE = re.compile(r"Gender\s*[:.]?\s*(Male|Female|Third|Other)", re.I)
+NAME_ANCHOR_RE = re.compile(
+    r"^\s*Name\s*[:.]", re.IGNORECASE
+)  # voter name line, not "Name of ..."
+NAME_RE = re.compile(r"\bName\s*[:.]?\s*(.+)", re.IGNORECASE)
+REL_RE = re.compile(r"(Father|Husband|Mother)'?s?\s*Name\s*[:.]?\s*(.+)", re.IGNORECASE)
+HOUSE_RE = re.compile(r"House\s*Number\s*[:.]?\s*(.+)", re.IGNORECASE)
+AGE_RE = re.compile(r"Age\s*[:.]?\s*(\d{1,3})", re.IGNORECASE)
+GENDER_RE = re.compile(r"Gender\s*[:.]?\s*(Male|Female|Third|Other)", re.IGNORECASE)
 
-HEADER_RE = re.compile(r"Assembly\s*Constituency|Part\s*No|Section\s*No", re.I)
-FOOTER_RE = re.compile(r"Age\s*as\s*on|Modified|Date\s*of\s*Publication|Total\s*Pages", re.I)
+HEADER_RE = re.compile(r"Assembly\s*Constituency|Part\s*No|Section\s*No", re.IGNORECASE)
+FOOTER_RE = re.compile(
+    r"Age\s*as\s*on|Modified|Date\s*of\s*Publication|Total\s*Pages", re.IGNORECASE
+)
 
 REL_CODE = {"father": "F", "husband": "H", "mother": "M"}
 SEX_CODE = {"male": "M", "female": "F", "third": "T", "other": "T"}
@@ -67,18 +71,22 @@ def parse_voter_blob(blob):
     name = ""
     nm = NAME_RE.search(blob)
     if nm:
-        name = re.split(r"(Father|Husband|Mother)'?s?\s*Name", nm.group(1), flags=re.I)[0].strip()
+        name = re.split(
+            r"(Father|Husband|Mother)'?s?\s*Name", nm.group(1), flags=re.IGNORECASE
+        )[0].strip()
 
     rel_type = rel_name = ""
     rm = REL_RE.search(blob)
     if rm:
         rel_type = REL_CODE.get(rm.group(1).lower(), "")
-        rel_name = re.split(r"House\s*Number|Age\s*[:.]", rm.group(2), flags=re.I)[0].strip()
+        rel_name = re.split(
+            r"House\s*Number|Age\s*[:.]", rm.group(2), flags=re.IGNORECASE
+        )[0].strip()
 
     house = ""
     hm = HOUSE_RE.search(blob)
     if hm:
-        house = re.split(r"Age\s*[:.]", hm.group(1), flags=re.I)[0].strip()
+        house = re.split(r"Age\s*[:.]", hm.group(1), flags=re.IGNORECASE)[0].strip()
 
     am = AGE_RE.search(blob)
     age = am.group(1) if am else ""
@@ -101,7 +109,9 @@ def parse_voter_blob(blob):
 
 def parse_interior_page(page):
     """Group body lines into the 30-voter grid, then parse each box."""
-    width = page.get("width") or max((l["x1"] for l in page.get("lines", [])), default=1)
+    width = page.get("width") or max(
+        (l["x1"] for l in page.get("lines", [])), default=1
+    )
     body = _body_lines(page)
     anchors = _anchors(body)
     if not anchors:
@@ -136,7 +146,14 @@ def dedupe_voters(voters):
     def score(v):
         return sum(
             1
-            for k in ("id", "elector_name", "father_or_husband_name", "house_no", "age", "sex")
+            for k in (
+                "id",
+                "elector_name",
+                "father_or_husband_name",
+                "house_no",
+                "age",
+                "sex",
+            )
             if v.get(k)
         )
 
@@ -168,7 +185,7 @@ _COVER_FIELDS = {
     "polling_station_address": r"Address\s*of\s*Polling\s*Station\b.*?([A-Z][A-Za-z0-9 .,'/&-]*?"
     r"(?:School|College|Vidyalaya|Building|Office|Hall|Centre|Center|Bhavan|Quarter)s?\b)",
 }
-_DISTRICT_RE = re.compile(r"^District\s*[:.]?\s*([A-Z][A-Za-z .'/-]+)$", re.M)
+_DISTRICT_RE = re.compile(r"^District\s*[:.]?\s*([A-Z][A-Za-z .'/-]+)$", re.MULTILINE)
 
 
 def parse_cover_page(page):
@@ -176,7 +193,7 @@ def parse_cover_page(page):
     flat = re.sub(r"[ \t]+", " ", text)
     meta = {}
     for key, pat in _COVER_FIELDS.items():
-        m = re.search(pat, flat, re.I | re.S)
+        m = re.search(pat, flat, re.IGNORECASE | re.DOTALL)
         meta[key] = m.group(1).strip(" :-") if m else ""
     dm = _DISTRICT_RE.search(text)
     meta["district"] = dm.group(1).strip() if dm else ""
@@ -188,7 +205,9 @@ def parse_cover_page(page):
             meta["ac_name"] = re.sub(r"\s*\(.*\)\s*$", "", am.group(2)).strip()
 
     nm = re.search(
-        r"NUMBER\s*OF\s*ELECTORS.*?(\d+)\D+(\d+)\D+(\d+)\D+(\d+)\D+(\d+)\D+(\d+)", flat, re.I | re.S
+        r"NUMBER\s*OF\s*ELECTORS.*?(\d+)\D+(\d+)\D+(\d+)\D+(\d+)\D+(\d+)\D+(\d+)",
+        flat,
+        re.IGNORECASE | re.DOTALL,
     )
     if nm:
         (
