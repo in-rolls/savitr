@@ -62,9 +62,13 @@ class MLXSuryaOCR:
     def __init__(
         self, mlx_path: str | None = None, max_tokens: int = 8192, prompt: str = PROMPT
     ) -> None:
-        from mlx_vlm import generate, load
-        from mlx_vlm.prompt_utils import apply_chat_template
-        from mlx_vlm.utils import load_config
+        # mlx-vlm is installed only on Apple Silicon; Linux still type-checks
+        # the pure-Python package and exercises its parser API.
+        from mlx_vlm import generate, load  # pyright: ignore[reportMissingImports]
+        from mlx_vlm.prompt_utils import (  # pyright: ignore[reportMissingImports]
+            apply_chat_template,
+        )
+        from mlx_vlm.utils import load_config  # pyright: ignore[reportMissingImports]
 
         mlx_path = base_model_path(mlx_path)
         self._generate = generate

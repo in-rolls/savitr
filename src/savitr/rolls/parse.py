@@ -142,7 +142,11 @@ def dedupe_voters(voters: list[dict]) -> list[dict]:
         if v.get("id"):
             key = ("epic", v["id"])
         elif v.get("number"):
-            key = ("number", v["number"])
+            key = (
+                "number",
+                v.get("original_or_amendment", "original"),
+                v["number"],
+            )
         else:
             key = (
                 "identity",
@@ -205,11 +209,10 @@ def parse_terse(text: str) -> list[dict]:
         parts = [p.strip() for p in line.split("|")]
         while parts and parts[0] == "":  # serial column is usually blank
             parts.pop(0)
+        if not parts:
+            continue
         # Gold targets lead with a numeric serial; model output may omit it.
-        if len(parts) > 1 and parts[0].isdigit() and _EPIC_TOK.fullmatch(parts[1]):
-            number = parts.pop(0)
-        else:
-            number = ""
+        number = parts.pop(0) if parts[0].isdigit() else ""
         if len(parts) < 2:
             continue
         v = dict.fromkeys(TERSE_COLS, "")

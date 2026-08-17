@@ -38,6 +38,21 @@ def test_terse_parser_keeps_tail_fields_aligned_without_relation_code() -> None:
     }
 
 
+def test_terse_parser_preserves_serial_without_epic() -> None:
+    parsed = parse_terse("31|Asha|F|Ram|12|30|F")
+
+    assert parsed == [
+        {
+            **voter(id=""),
+            "original_or_amendment": "original",
+        }
+    ]
+
+
+def test_terse_parser_ignores_empty_delimited_line() -> None:
+    assert parse_terse("||||") == []
+
+
 def test_dedupe_uses_serial_before_fallback_identity() -> None:
     same_identity = voter(id="", number="32")
 
@@ -49,6 +64,18 @@ def test_dedupe_keeps_fullest_copy_of_a_repeated_serial() -> None:
     complete = voter(id="")
 
     assert dedupe_voters([incomplete, complete]) == [complete]
+
+
+def test_dedupe_separates_original_and_amendment_serials() -> None:
+    original = voter(id="", number="1", original_or_amendment="original")
+    amendment = voter(
+        id="",
+        number="1",
+        elector_name="Ravi",
+        original_or_amendment="amendment",
+    )
+
+    assert dedupe_voters([original, amendment]) == [original, amendment]
 
 
 def test_html_parser_does_not_truncate_legitimate_same_name_and_age() -> None:
