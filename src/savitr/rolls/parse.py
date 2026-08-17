@@ -137,8 +137,9 @@ def dedupe_voters(voters: list[dict]) -> list[dict]:
             if v.get(k)
         )
 
-    best: dict = {}
+    best: dict[tuple[str, ...], dict] = {}
     for v in voters:
+        key: tuple[str, ...]
         if v.get("id"):
             key = ("epic", v["id"])
         elif v.get("number"):
@@ -213,6 +214,8 @@ def parse_terse(text: str) -> list[dict]:
             continue
         # Gold targets lead with a numeric serial; model output may omit it.
         number = parts.pop(0) if parts[0].isdigit() else ""
+        if parts and not parts[0]:
+            parts.pop(0)
         if len(parts) < 2:
             continue
         v = dict.fromkeys(TERSE_COLS, "")

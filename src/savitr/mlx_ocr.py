@@ -64,11 +64,11 @@ class MLXSuryaOCR:
     ) -> None:
         # mlx-vlm is installed only on Apple Silicon; Linux still type-checks
         # the pure-Python package and exercises its parser API.
-        from mlx_vlm import generate, load  # pyright: ignore[reportMissingImports]
-        from mlx_vlm.prompt_utils import (  # pyright: ignore[reportMissingImports]
+        from mlx_vlm import generate, load  # type: ignore[import-not-found]
+        from mlx_vlm.prompt_utils import (  # type: ignore[import-not-found]
             apply_chat_template,
         )
-        from mlx_vlm.utils import load_config  # pyright: ignore[reportMissingImports]
+        from mlx_vlm.utils import load_config  # type: ignore[import-not-found]
 
         mlx_path = base_model_path(mlx_path)
         self._generate = generate

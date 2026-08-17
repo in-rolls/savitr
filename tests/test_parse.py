@@ -49,6 +49,17 @@ def test_terse_parser_preserves_serial_without_epic() -> None:
     ]
 
 
+def test_terse_parser_consumes_empty_epic_column() -> None:
+    parsed = parse_terse("31||Asha|F|Ram|12|30|F")
+
+    assert parsed == [
+        {
+            **voter(id=""),
+            "original_or_amendment": "original",
+        }
+    ]
+
+
 def test_terse_parser_ignores_empty_delimited_line() -> None:
     assert parse_terse("||||") == []
 
