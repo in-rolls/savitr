@@ -95,7 +95,7 @@ def main():
         print(f"  {f:<26} {h}/{c} = {100*h/c if c else 0:5.1f}%")
     print(
         f"  {'record similarity':<26} avg {100*sum(sims)/max(len(sims),1):5.1f}% "
-        f"(1 - norm. edit distance, {len(sims)} matched voters)"
+        f"(SequenceMatcher ratio, {len(sims)} matched voters)"
     )
     print(f"  {'whole-page similarity':<26} avg {100*sum(page_sims)/max(len(page_sims),1):5.1f}%")
 

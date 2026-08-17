@@ -30,3 +30,7 @@ dist/
 .mypy_cache/
 .ruff_cache/
 docs/_build/
+_site/
+_doctest/
+.coverage*
+htmlcov/

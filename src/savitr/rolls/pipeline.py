@@ -1,26 +1,22 @@
-#!/usr/bin/env python3
-"""Parse Manipur 2025 rolls into the canonical voter CSV — using the fast MLX OCR engine.
+"""Parse Manipur 2025 rolls into the canonical voter CSV.
 
-Drop-in alternative to the repo's RapidOCR-based `parse_manipur_2025.py`, but ~5× faster and
-higher fidelity: it OCRs each page with MLX Surya (~34 s/page), parses voters layout-robustly,
-and reuses the existing `fields.py` (cover-page metadata + serial dedup) and column schema so
-the output is byte-compatible with the rest of the pipeline.
+The pipeline OCRs each page with MLX Surya, parses voter records, and applies
+the in-rolls column schema.
 
-Run in the MLX env:
-  .venv-mlx/bin/python savitr/parse_manipur_mlx.py -f AC01_part001_final_ENG.pdf -o out.csv
-  .venv-mlx/bin/python savitr/parse_manipur_mlx.py -d english/ -o out.csv [--limit N] [--resume]
+Use ``savitr parse-rolls --help`` for command-line options.
 """
 
 import argparse
 import csv
-import glob
 import logging
-import os
 import re
 import sys
+import tempfile
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
+from savitr.rolls import fields
 from savitr.rolls.parse import (
     TERSE_PROMPT,
     dedupe_voters,
@@ -29,46 +25,31 @@ from savitr.rolls.parse import (
     resolve_terse_model,
 )
 from savitr.rolls.pdfio import page_count, render_page, require_poppler
+from savitr.rolls.schema import COLUMNS, STATE, YEAR, ac_part_from_filename
 
 if TYPE_CHECKING:
     from savitr.mlx_ocr import MLXSuryaOCR
 
-# Roll schema + cover-field logic. Default to savitr's vendored copy (self-contained); set
-# MANIPUR_DIR to point at parse_unsearchable_rolls/scripts/manipur to use that repo's copy instead.
-MANIPUR_DIR = os.environ.get("MANIPUR_DIR")
-if MANIPUR_DIR:
-    sys.path.insert(0, MANIPUR_DIR)
-    import fields  # noqa: E402
-
-    # Resolved from MANIPUR_DIR, inserted into sys.path four lines above, so it
-    # is unresolvable statically by construction.
-    from parse_manipur_2025 import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-        COLUMNS,
-        STATE,
-        YEAR,
-        ac_part_from_filename,
-    )
-else:
-    from savitr.rolls import fields
-    from savitr.rolls.schema import COLUMNS, STATE, YEAR, ac_part_from_filename
-
 log = logging.getLogger("parse_manipur_mlx")
 
-_BREAK = re.compile(r"</(tr|p|td|th|div)>|<br\s*/?>", re.I)
+_BREAK = re.compile(r"</(tr|p|td|th|div)>|<br\s*/?>", re.IGNORECASE)
 _TAG = re.compile(r"<[^>]+>")
 
 
 def html_to_text(html: str) -> str:
-    """HTML -> newline-separated text (so fields.py's cover regexes see line structure)."""
+    """Convert HTML to newline-separated text for cover-field parsing."""
     t = _BREAK.sub("\n", html)
     t = _TAG.sub(" ", t)
     return "\n".join(ln.strip() for ln in t.splitlines() if ln.strip())
 
 
 def _synthetic_page(text: str) -> dict:
-    """Build a minimal page dict that fields.page_text / parse_cover_page can consume."""
+    """Build the minimal page object required by the cover parser."""
     return {
-        "lines": [{"text": ln, "cx": 0, "cy": i * 10} for i, ln in enumerate(text.splitlines())]
+        "lines": [
+            {"text": ln, "cx": 0, "cy": i * 10}
+            for i, ln in enumerate(text.splitlines())
+        ]
     }
 
 
@@ -81,30 +62,32 @@ def parse_pdf_mlx(
 ) -> tuple[list[dict], dict]:
     """OCR + parse one PDF with MLX; return (rows, recon) in the canonical schema.
 
-    terse mode (default): the terse model ``eng`` reads every page for voters (covers yield none),
-    and — only if ``cover_eng`` is provided — the HTML model reads the first two pages for cover
-    metadata. Without a cover model, voter extraction still works; cover metadata is just skipped
-    and the AC/part number is taken from the filename.
+    In terse mode, ``eng`` reads voters from every page. If ``cover_eng`` is
+    provided, it reads the first two pages for metadata.
 
-    HTML mode (``terse=False``): the HTML model ``eng`` reads every page for voters + metadata.
+    In HTML mode, ``eng`` reads both voters and metadata.
     """
-    fname = os.path.basename(pdf_path)
+    fname = Path(pdf_path).name
     ac_no, part_no = ac_part_from_filename(fname)
     npages = page_count(pdf_path)
 
     page_texts = []
     voters = []
     for i in range(npages):
-        png = render_page(pdf_path, i + 1, dpi, f"/tmp/mlx_{os.getpid()}_p{i + 1}.png")
-        if terse:  # terse model reads voters from every page (covers simply yield none)
-            voters.extend(parse_terse(eng.ocr_image(png)[0]))
-            if cover_eng is not None and i < 2:  # optional cover metadata
-                page_texts.append(html_to_text(cover_eng.ocr_image(png)[0]))
-        else:  # HTML mode: one model does voters + metadata
-            html, _ = eng.ocr_image(png)
-            page_texts.append(html_to_text(html))
-            voters.extend(parse_voters(html))
-        os.remove(png)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as temporary:
+            png = temporary.name
+        try:
+            render_page(pdf_path, i + 1, dpi, png)
+            if terse:
+                voters.extend(parse_terse(eng.ocr_image(png)[0]))
+                if cover_eng is not None and i < 2:
+                    page_texts.append(html_to_text(cover_eng.ocr_image(png)[0]))
+            else:
+                html, _ = eng.ocr_image(png)
+                page_texts.append(html_to_text(html))
+                voters.extend(parse_voters(html))
+        finally:
+            Path(png).unlink(missing_ok=True)
 
     # cover page = first page with the elector summary / "ELECTORAL ROLL" header
     meta = {}
@@ -117,7 +100,7 @@ def parse_pdf_mlx(
     voters = dedupe_voters(voters)
 
     header = {
-        "ac_name": meta.get("ac_name", "") or (ac_no if ac_no else ""),
+        "ac_name": meta.get("ac_name", "") or (ac_no or ""),
         "parl_constituency": meta.get("parl_constituency", ""),
         "part_no": meta.get("part_no") or part_no,
         "year": meta.get("year") or YEAR,
@@ -139,7 +122,7 @@ def parse_pdf_mlx(
 
     rows = []
     for v in voters:
-        row = {c: "" for c in COLUMNS}
+        row = dict.fromkeys(COLUMNS, "")
         row.update(header)
         row.update(v)
         rows.append(row)
@@ -162,41 +145,47 @@ def main() -> int:
     g.add_argument("-d", "--dir", help="a directory of *_ENG.pdf files")
     ap.add_argument("-o", "--out", required=True, help="output CSV path")
     ap.add_argument(
-        "--terse",
-        action="store_true",
-        help="(default) use the distilled terse-Surya voter model (~2.7x faster, Surya accuracy)",
-    )
-    ap.add_argument(
         "--html",
         action="store_true",
-        help="use the full Surya HTML model instead (needs a local --mlx-path Surya MLX model)",
+        help="use base Surya HTML output (requires a local MLX model)",
     )
     ap.add_argument(
-        "--mlx-path", default=None, help="override the voter model dir (default: the terse model)"
+        "--mlx-path",
+        default=None,
+        help="override the voter model dir (default: the terse model)",
     )
     ap.add_argument(
         "--cover-model",
         default="models/surya-mlx-4bit",
-        help="local Surya MLX model for cover-page metadata (optional; skipped if absent)",
+        help="optional base Surya model for cover-page metadata",
     )
     ap.add_argument("--dpi", type=int, default=192)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument(
-        "--resume", action="store_true", help="skip PDFs already present in the output CSV"
+        "--resume",
+        action="store_true",
+        help="skip PDFs already present in the output CSV",
     )
     args = ap.parse_args()
 
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S"
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
     )
 
-    pdfs = [args.file] if args.file else sorted(glob.glob(os.path.join(args.dir, "*_ENG.pdf")))
+    pdfs = (
+        [args.file]
+        if args.file
+        else [str(path) for path in sorted(Path(args.dir).glob("*_ENG.pdf"))]
+    )
     if args.limit:
         pdfs = pdfs[: args.limit]
 
+    out_path = Path(args.out)
     done = set()
-    if args.resume and os.path.exists(args.out):
-        with open(args.out, newline="", encoding="utf-8") as fh:
+    if args.resume and out_path.exists():
+        with out_path.open(newline="", encoding="utf-8") as fh:
             done = {r["filename"] for r in csv.DictReader(fh)}
 
     require_poppler()  # fail fast with a friendly hint before loading a model
@@ -208,16 +197,13 @@ def main() -> int:
     if terse:
         voter_path = args.mlx_path or resolve_terse_model()
         eng = MLXSuryaOCR(voter_path, max_tokens=2048, prompt=TERSE_PROMPT)
-        # The cover model is base Surya and is optional: without it the AC and part come from
-        # the filename and the run continues. So this reports the same thing --html would refuse
-        # over, and keeps going - a missing optional model should say why, not stop a batch.
         try:
             cover_path = base_model_path(args.cover_model)
             log.info("terse voter model %s + cover model %s", voter_path, cover_path)
             cover_eng = MLXSuryaOCR(cover_path, max_tokens=8192)
         except FileNotFoundError as missing:
             log.info(
-                "terse voter model %s; cover metadata skipped (AC/part from filename).\n%s",
+                "terse model %s; cover metadata skipped (filename fallback).\n%s",
                 voter_path,
                 missing,
             )
@@ -226,21 +212,24 @@ def main() -> int:
         log.info("loading Surya HTML model %s ...", html_path)
         eng = MLXSuryaOCR(html_path)
 
-    write_header = not (args.resume and os.path.exists(args.out))
+    write_header = not (args.resume and out_path.exists())
     total_voters = 0
-    with open(args.out, "a" if args.resume else "w", newline="", encoding="utf-8") as fh:
+    with out_path.open("a" if args.resume else "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=COLUMNS)
         if write_header:
             writer.writeheader()
         for i, pdf in enumerate(pdfs, 1):
-            if os.path.basename(pdf) in done:
-                log.info("[%d/%d] skip (done) %s", i, len(pdfs), os.path.basename(pdf))
+            pdf_name = Path(pdf).name
+            if pdf_name in done:
+                log.info("[%d/%d] skip (done) %s", i, len(pdfs), pdf_name)
                 continue
             t = time.time()
             try:
-                rows, recon = parse_pdf_mlx(eng, pdf, args.dpi, terse=terse, cover_eng=cover_eng)
-            except Exception as exc:  # noqa: BLE001 - one bad PDF must not kill the run
-                log.exception("FAILED %s: %s", os.path.basename(pdf), exc)
+                rows, recon = parse_pdf_mlx(
+                    eng, pdf, args.dpi, terse=terse, cover_eng=cover_eng
+                )
+            except Exception as exc:
+                log.exception("FAILED %s: %s", pdf_name, exc)
                 continue
             writer.writerows(rows)
             fh.flush()
@@ -255,7 +244,7 @@ def main() -> int:
                 "[%d/%d] %s: %d voters (net=%s) %.0fs%s",
                 i,
                 len(pdfs),
-                os.path.basename(pdf),
+                pdf_name,
                 recon["voters_extracted"],
                 net or "?",
                 time.time() - t,

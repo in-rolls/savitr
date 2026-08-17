@@ -1,0 +1,13 @@
+# Managed by copier — records template version for `copier update`. Do not edit.
+_commit: v1
+_src_path: gh:gojiplus/py-canon
+author_email: gsood07@gmail.com
+author_name: in-rolls
+coverage_floor: 30
+default_branch: main
+description: Fast Surya OCR on Apple Silicon for Indian electoral rolls (MLX runtime
+    + a distilled terse roll model)
+needs_cli: true
+org: in-rolls
+package_name: savitr
+project_name: savitr

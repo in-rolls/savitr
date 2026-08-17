@@ -1,7 +1,6 @@
 """Canonical in-rolls voter CSV schema (vendored from parse_unsearchable_rolls).
 
-Kept byte-compatible with parse_unsearchable_rolls/scripts/manipur/parse_manipur_2025.py so
-savitr's CSV output drops into the same downstream pipeline.
+The output stays compatible with the ``parse_unsearchable_rolls`` pipeline.
 """
 
 import re
@@ -43,5 +42,5 @@ YEAR = "2025"
 
 def ac_part_from_filename(name: str) -> tuple[str, str]:
     """AC01_part001_final_ENG.pdf -> ('1', '1')."""
-    m = re.search(r"AC(\d+)_part(\d+)", name, re.I)
+    m = re.search(r"AC(\d+)_part(\d+)", name, re.IGNORECASE)
     return (str(int(m.group(1))), str(int(m.group(2)))) if m else ("", "")
