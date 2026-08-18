@@ -1748,7 +1748,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate", marker = "extra == 'train'", specifier = ">=0.30" },
-    { name = "huggingface-hub", specifier = ">=0.23" },
+    { name = "huggingface-hub", specifier = ">=1.27.0" },
     { name = "mlx-vlm", marker = "platform_machine == 'arm64' and sys_platform == 'darwin'", specifier = ">=0.1" },
     { name = "pdf2image", specifier = ">=1.16" },
     { name = "peft", marker = "extra == 'train'", specifier = ">=0.11" },
