@@ -48,8 +48,12 @@ module-name = "savitr"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--strict-markers", "-m", "not live"]
+addopts = ["--strict-markers", "-m", "not live", "--strict-config", "-ra"]
 markers = ["live: reaches Hugging Face and is deselected by default"]
+minversion = "6"
+log_level = "INFO"
+xfail_strict = true
+filterwarnings = ["error"]
 
 [tool.ruff]
 line-length = 88
