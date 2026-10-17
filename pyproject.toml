@@ -121,4 +121,5 @@ typeCheckingMode = "standard"
 source = ["src"]
 
 [tool.codespell]
+builtin = "clear,rare,en-GB_to_en-US"
 skip = "corpus/*,corpus_*/*,models/*,pages/*,kernel/*,kernel_*/*,docs/_build/*,_site/*,_doctest/*,dist/*,*.json,*.jsonl"

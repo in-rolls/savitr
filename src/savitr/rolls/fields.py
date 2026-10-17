@@ -183,7 +183,7 @@ _COVER_FIELDS = {
     "pin_code": r"Pin\s*code\s*[:.]?\s*(\d{6})",
     "polling_station_name": r"Name\s*of\s*Polling\s*Station\s*[:.]?.{0,80}?(\d+\s*-\s*[A-Z][A-Za-z .'/-]+?)(?:\s*Address|\n|$)",
     "polling_station_address": r"Address\s*of\s*Polling\s*Station\b.*?([A-Z][A-Za-z0-9 .,'/&-]*?"
-    r"(?:School|College|Vidyalaya|Building|Office|Hall|Centre|Center|Bhavan|Quarter)s?\b)",
+    r"(?:School|College|Vidyalaya|Building|Office|Hall|Centre|Center|Bhavan|Quarter)s?\b)",  # codespell:ignore centre
 }
 _DISTRICT_RE = re.compile(r"^District\s*[:.]?\s*([A-Z][A-Za-z .'/-]+)$", re.MULTILINE)
 
