@@ -41,7 +41,6 @@ jobs:
     uses: gojiplus/py-canon/.github/workflows/reusable-release.yml@v1
     permissions:
       contents: write
-      id-token: write
     with:
       github-release: false
 
