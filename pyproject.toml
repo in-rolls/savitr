@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-train = ["transformers>=5.12", "peft>=0.11", "accelerate>=0.30", "torch>=2.2"]
+train = ["transformers>=5.12", "peft>=0.11", "accelerate>=0.30", "torch>=2.5.0"]
 
 [project.scripts]
 savitr = "savitr.cli:main"
