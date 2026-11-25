@@ -1647,7 +1647,7 @@ requires-dist = [
     { name = "pdf2image", specifier = ">=1.16" },
     { name = "peft", marker = "extra == 'train'", specifier = ">=0.11" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "torch", marker = "extra == 'train'", specifier = ">=2.2" },
+    { name = "torch", marker = "extra == 'train'", specifier = ">=2.5.0" },
     { name = "transformers", marker = "extra == 'train'", specifier = ">=5.12" },
 ]
 provides-extras = ["train"]
